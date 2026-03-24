@@ -1,3 +1,7 @@
+require("dotenv").config({
+  path: require("path").resolve(__dirname, "../.env"),
+});
+
 module.exports = {
   development: {
     client: "mysql2",
@@ -23,3 +27,5 @@ module.exports = {
     debug: false,
   },
 };
+
+console.log("🔥", process.env.DEV_DB_USER);
