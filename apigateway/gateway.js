@@ -3,8 +3,8 @@ const routes = require("../routes/index");
 
 module.exports = (app) => {
   // Dev and Live APIs
-  app.use("/api/ont/v1/dev", dbCheck, routes);
-  app.use("/api/ont/v1/live", dbCheck, routes);
+  app.use("/api/booking/v1/dev", dbCheck, routes);
+  app.use("/api/booking/v1/live", dbCheck, routes);
 
   // Health check
   app.get("/", (req, res) =>
@@ -13,6 +13,9 @@ module.exports = (app) => {
 
   // 404 handler
   app.use((req, res) => {
-    res.status(404).send({ error: "Route not found" });
+    res.status(404).json({
+      success: false,
+      message: "Route not found",
+    });
   });
 };
