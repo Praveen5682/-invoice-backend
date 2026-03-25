@@ -1,5 +1,9 @@
 const service = require("../service/index");
-const { bookTicketSchema } = require("../validator/index");
+const {
+  bookTicketSchema,
+  deleteTicketSchema,
+  updateTicketSchema,
+} = require("../validator/index");
 
 // 🔹 Book Ticket
 module.exports.bookTicket = async (req, res) => {
@@ -15,13 +19,12 @@ module.exports.bookTicket = async (req, res) => {
       });
     }
 
-    const response = await service.bookTicket(id, value);
+    const response = await service.bookTicket({ id, userData: value });
 
     return res.status(response.success ? 200 : 400).json({
       success: response.success,
       message: response.message,
       data: response.data || null,
-      error: response.error || null,
     });
   } catch (error) {
     console.error("Controller Error (bookTicket):", error);
@@ -91,7 +94,7 @@ module.exports.updateTicket = async (req, res) => {
       });
     }
 
-    const response = await service.updateTicket(id, value);
+    const response = await service.updateTicket({ id, userData: value });
 
     return res.status(response.success ? 200 : 400).json({
       success: response.success,
@@ -114,6 +117,13 @@ module.exports.updateTicket = async (req, res) => {
 module.exports.deleteTicket = async (req, res) => {
   try {
     const { id } = req.params;
+    const ticketId = parseInt(id, 10);
+
+    if (isNaN(ticketId)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid ticket ID" });
+    }
 
     const { error } = deleteTicketSchema.validate({ id });
     if (error) {
@@ -123,12 +133,11 @@ module.exports.deleteTicket = async (req, res) => {
       });
     }
 
-    const response = await service.deleteTicket(id);
+    const response = await service.deleteTicket({ id: ticketId });
 
     return res.status(response.success ? 200 : 400).json({
       success: response.success,
       message: response.message,
-      error: response.error || null,
     });
   } catch (error) {
     console.error("Controller Error (deleteTicket):", error); // ✅ add log

@@ -19,7 +19,6 @@ router.delete("/tickets/:id", controller.deleteTicket);
 
 // Admin API to reset all tickets
 router.post("/tickets/reset", controller.resetServer);
-
 // View Ticket Status
 // router.get("/tickets/:id/status", controller.getTicketStatus);
 

@@ -9,6 +9,8 @@ const TICKET_STATUS = {
 module.exports.bookTicket = async (props = {}) => {
   const { id, userData } = props;
   try {
+    let bookedTicket; // ✅ declare outside transaction
+
     await db.transaction(async (trx) => {
       const ticket = await trx("tickets")
         .where({ ticket_id: id })
@@ -28,11 +30,16 @@ module.exports.bookTicket = async (props = {}) => {
         user_name: userData.user_name,
         user_email: userData.user_email,
       });
+
+      bookedTicket = await trx("tickets") // ✅ fetch updated ticket inside transaction
+        .where({ ticket_id: id })
+        .first();
     });
 
     return {
       success: true,
       message: "Ticket booked successfully.",
+      data: bookedTicket, // ✅ now available here
     };
   } catch (error) {
     console.error("Service Error (bookTicket):", error);
@@ -43,7 +50,6 @@ module.exports.bookTicket = async (props = {}) => {
     };
   }
 };
-
 // 🔹 Get Open Tickets
 module.exports.getOpenTickets = async () => {
   try {
@@ -93,7 +99,6 @@ module.exports.getClosedTickets = async () => {
 // 🔹 Update Ticket
 module.exports.updateTicket = async (props = {}) => {
   const { id, userData } = props;
-
   try {
     const ticket = await db("tickets").where({ ticket_id: id }).first();
 
@@ -111,9 +116,12 @@ module.exports.updateTicket = async (props = {}) => {
       user_phone: userData.user_phone,
     });
 
+    const updatedTicket = await db("tickets").where({ ticket_id: id }).first();
+
     return {
       success: true,
       message: "Ticket updated successfully",
+      data: updatedTicket, // ✅ actual ticket object
     };
   } catch (error) {
     return {
@@ -135,6 +143,10 @@ module.exports.deleteTicket = async (props = {}) => {
       return { success: false, message: "Ticket not found" };
     }
 
+    if (ticket.status === TICKET_STATUS.OPEN) {
+      return { success: false, message: "Ticket is not booked yet" };
+    }
+
     await db("tickets").where({ ticket_id: id }).update({
       status: TICKET_STATUS.OPEN,
       user_name: null,
@@ -142,16 +154,9 @@ module.exports.deleteTicket = async (props = {}) => {
       user_phone: null,
     });
 
-    return {
-      success: true,
-      message: "Ticket deleted successfully",
-    };
+    return { success: true, message: "Ticket deleted successfully" };
   } catch (error) {
-    return {
-      success: false,
-      message: "Delete failed",
-      error: error.message,
-    };
+    return { success: false, message: "Delete failed", error: error.message };
   }
 };
 
