@@ -79,12 +79,19 @@ module.exports.getClosedTickets = async (req, res) => {
 };
 
 // 🔹 update Ticket
-
 module.exports.updateTicket = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const response = await service.updateTicket(id, req.body);
+    const { error, value } = updateTicketSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.details[0].message,
+      });
+    }
+
+    const response = await service.updateTicket(id, value);
 
     return res.status(response.success ? 200 : 400).json({
       success: response.success,
@@ -93,9 +100,12 @@ module.exports.updateTicket = async (req, res) => {
       error: response.error || null,
     });
   } catch (error) {
+    console.error("Controller Error (updateTicket):", error); // ✅ add log
+
     return res.status(500).json({
       success: false,
       message: "Internal server error",
+      error: error.message, // ✅ helpful for debugging
     });
   }
 };
@@ -105,6 +115,14 @@ module.exports.deleteTicket = async (req, res) => {
   try {
     const { id } = req.params;
 
+    const { error } = deleteTicketSchema.validate({ id });
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.details[0].message,
+      });
+    }
+
     const response = await service.deleteTicket(id);
 
     return res.status(response.success ? 200 : 400).json({
@@ -113,9 +131,12 @@ module.exports.deleteTicket = async (req, res) => {
       error: response.error || null,
     });
   } catch (error) {
+    console.error("Controller Error (deleteTicket):", error); // ✅ add log
+
     return res.status(500).json({
       success: false,
       message: "Internal server error",
+      error: error.message, // ✅ helpful
     });
   }
 };
