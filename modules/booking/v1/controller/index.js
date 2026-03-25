@@ -103,12 +103,12 @@ module.exports.updateTicket = async (req, res) => {
       error: response.error || null,
     });
   } catch (error) {
-    console.error("Controller Error (updateTicket):", error); // ✅ add log
+    console.error("Controller Error (updateTicket):", error);
 
     return res.status(500).json({
       success: false,
       message: "Internal server error",
-      error: error.message, // ✅ helpful for debugging
+      error: error.message,
     });
   }
 };
@@ -140,12 +140,12 @@ module.exports.deleteTicket = async (req, res) => {
       message: response.message,
     });
   } catch (error) {
-    console.error("Controller Error (deleteTicket):", error); // ✅ add log
+    console.error("Controller Error (deleteTicket):", error);
 
     return res.status(500).json({
       success: false,
       message: "Internal server error",
-      error: error.message, // ✅ helpful
+      error: error.message,
     });
   }
 };

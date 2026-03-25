@@ -5,11 +5,11 @@ const TICKET_STATUS = {
   CLOSED: 1,
 };
 
-// 🔹 Book Ticket (WITH TRANSACTION 🔥)
+// 🔹 Book Ticket
 module.exports.bookTicket = async (props = {}) => {
   const { id, userData } = props;
   try {
-    let bookedTicket; // ✅ declare outside transaction
+    let bookedTicket;
 
     await db.transaction(async (trx) => {
       const ticket = await trx("tickets")
@@ -31,15 +31,13 @@ module.exports.bookTicket = async (props = {}) => {
         user_email: userData.user_email,
       });
 
-      bookedTicket = await trx("tickets") // ✅ fetch updated ticket inside transaction
-        .where({ ticket_id: id })
-        .first();
+      bookedTicket = await trx("tickets").where({ ticket_id: id }).first();
     });
 
     return {
       success: true,
       message: "Ticket booked successfully.",
-      data: bookedTicket, // ✅ now available here
+      data: bookedTicket,
     };
   } catch (error) {
     console.error("Service Error (bookTicket):", error);
@@ -121,7 +119,7 @@ module.exports.updateTicket = async (props = {}) => {
     return {
       success: true,
       message: "Ticket updated successfully",
-      data: updatedTicket, // ✅ actual ticket object
+      data: updatedTicket,
     };
   } catch (error) {
     return {
