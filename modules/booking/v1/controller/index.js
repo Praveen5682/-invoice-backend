@@ -9,8 +9,6 @@ module.exports.resetServer = async (req, res) => {
     return res.status(response.success ? 200 : 400).json({
       success: response.success,
       message: response.message,
-      data: response.data || null,
-      error: response.error || null,
     });
   } catch (error) {
     console.error("Controller Error (resetServer):", error);
@@ -67,7 +65,6 @@ module.exports.getTicketStatus = async (req, res) => {
       success: response.success,
       message: response.message,
       data: response.data || null,
-      error: response.error || null,
     });
   } catch (error) {
     console.error("Controller Error (getTicketStatus):", error);

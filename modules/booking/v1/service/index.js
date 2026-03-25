@@ -35,7 +35,10 @@ module.exports.resetServer = async () => {
 module.exports.bookTicket = async (id, userData) => {
   try {
     await db.transaction(async (trx) => {
-      const ticket = await trx("tickets").where({ id }).first().forUpdate();
+      const ticket = await trx("tickets")
+        .where({ ticket_id: id })
+        .first()
+        .forUpdate();
 
       if (!ticket) {
         throw new Error("Invalid seat number.");
@@ -45,26 +48,23 @@ module.exports.bookTicket = async (id, userData) => {
         throw new Error("Ticket already booked.");
       }
 
-      await trx("tickets").where({ id }).update({
+      await trx("tickets").where({ ticket_id: id }).update({
         status: TICKET_STATUS.CLOSED,
         user_name: userData.user_name,
         user_email: userData.user_email,
-        user_phone: userData.user_phone,
       });
     });
 
     return {
       success: true,
       message: "Ticket booked successfully.",
-      data: null,
     };
   } catch (error) {
     console.error("Service Error (bookTicket):", error);
 
     return {
       success: false,
-      message: error.message || "Failed to book ticket",
-      error: error.message,
+      message: error.message,
     };
   }
 };
@@ -72,7 +72,7 @@ module.exports.bookTicket = async (id, userData) => {
 // 🔹 Get Ticket Status
 module.exports.getTicketStatus = async (id) => {
   try {
-    const ticket = await db("tickets").where({ id }).first();
+    const ticket = await db("tickets").where({ ticket_id: id }).first();
 
     if (!ticket) {
       return { success: false, message: "Invalid seat number." };
@@ -146,7 +146,7 @@ module.exports.getOpenTickets = async () => {
 // 🔹 Get Ticket User Details
 module.exports.getTicketUserDetails = async (id) => {
   try {
-    const ticket = await db("tickets").where({ id }).first();
+    const ticket = await db("tickets").where({ ticket_id: id }).first();
 
     if (!ticket) {
       return { success: false, message: "Invalid seat number." };
