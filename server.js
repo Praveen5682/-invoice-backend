@@ -1,15 +1,18 @@
-    const express = require("express");
-    const gateway = require("./apigateway/gateway");
-    require("dotenv").config();
+const express = require("express");
+const cors = require("cors");
+const gateway = require("./apigateway/gateway");
+require("dotenv").config();
 
-    const app = express();
-    app.use(express.json());
+const app = express();
 
-    // Register API gateway
-    gateway(app);
+app.use(express.json());
+app.use(cors());
 
-    const PORT = process.env.PORT || 3000;
+// Register API gateway
+gateway(app);
 
-    app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-    });
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});

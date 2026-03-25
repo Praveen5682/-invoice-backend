@@ -1,26 +1,6 @@
 const service = require("../service/index");
 const { bookTicketSchema } = require("../validator/index");
 
-// 🔹 Reset Server
-module.exports.resetServer = async (req, res) => {
-  try {
-    const response = await service.resetServer();
-
-    return res.status(response.success ? 200 : 400).json({
-      success: response.success,
-      message: response.message,
-    });
-  } catch (error) {
-    console.error("Controller Error (resetServer):", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: error.message,
-    });
-  }
-};
-
 // 🔹 Book Ticket
 module.exports.bookTicket = async (req, res) => {
   try {
@@ -54,20 +34,19 @@ module.exports.bookTicket = async (req, res) => {
   }
 };
 
-// 🔹 Get Ticket Status
-module.exports.getTicketStatus = async (req, res) => {
+// 🔹 Get Open Tickets
+module.exports.getOpenTickets = async (req, res) => {
   try {
-    const { id } = req.params;
+    const response = await service.getOpenTickets();
 
-    const response = await service.getTicketStatus(id);
-
-    return res.status(response.success ? 200 : 404).json({
+    return res.status(200).json({
       success: response.success,
       message: response.message,
       data: response.data || null,
+      error: response.error || null,
     });
   } catch (error) {
-    console.error("Controller Error (getTicketStatus):", error);
+    console.error("Controller Error (getOpenTickets):", error);
 
     return res.status(500).json({
       success: false,
@@ -99,43 +78,59 @@ module.exports.getClosedTickets = async (req, res) => {
   }
 };
 
-// 🔹 Get Open Tickets
-module.exports.getOpenTickets = async (req, res) => {
-  try {
-    const response = await service.getOpenTickets();
+// 🔹 update Ticket
 
-    return res.status(200).json({
-      success: response.success,
-      message: response.message,
-      data: response.data || null,
-      error: response.error || null,
-    });
-  } catch (error) {
-    console.error("Controller Error (getOpenTickets):", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: error.message,
-    });
-  }
-};
-
-// 🔹 Get Ticket User Details
-module.exports.getTicketUserDetails = async (req, res) => {
+module.exports.updateTicket = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const response = await service.getTicketUserDetails(id);
+    const response = await service.updateTicket(id, req.body);
 
-    return res.status(response.success ? 200 : 404).json({
+    return res.status(response.success ? 200 : 400).json({
       success: response.success,
       message: response.message,
       data: response.data || null,
       error: response.error || null,
     });
   } catch (error) {
-    console.error("Controller Error (getTicketUserDetails):", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+// 🔹 Delete Ticket
+module.exports.deleteTicket = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const response = await service.deleteTicket(id);
+
+    return res.status(response.success ? 200 : 400).json({
+      success: response.success,
+      message: response.message,
+      error: response.error || null,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+// 🔹 Reset Server
+module.exports.resetServer = async (req, res) => {
+  try {
+    const response = await service.resetServer();
+
+    return res.status(response.success ? 200 : 400).json({
+      success: response.success,
+      message: response.message,
+    });
+  } catch (error) {
+    console.error("Controller Error (resetServer):", error);
 
     return res.status(500).json({
       success: false,
@@ -144,3 +139,50 @@ module.exports.getTicketUserDetails = async (req, res) => {
     });
   }
 };
+
+// 🔹 Get Ticket Status
+// module.exports.getTicketStatus = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+
+//     const response = await service.getTicketStatus(id);
+
+//     return res.status(response.success ? 200 : 404).json({
+//       success: response.success,
+//       message: response.message,
+//       data: response.data || null,
+//     });
+//   } catch (error) {
+//     console.error("Controller Error (getTicketStatus):", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal server error",
+//       error: error.message,
+//     });
+//   }
+// };
+
+// 🔹 Get Ticket User Details
+// module.exports.getTicketUserDetails = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+
+//     const response = await service.getTicketUserDetails(id);
+
+//     return res.status(response.success ? 200 : 404).json({
+//       success: response.success,
+//       message: response.message,
+//       data: response.data || null,
+//       error: response.error || null,
+//     });
+//   } catch (error) {
+//     console.error("Controller Error (getTicketUserDetails):", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal server error",
+//       error: error.message,
+//     });
+//   }
+// };
