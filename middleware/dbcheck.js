@@ -21,4 +21,4 @@ const dbCheck = async (req, res, next) => {
   }
 };
 
-module.exports = { dbCheck };
+module.exports = dbCheck;
