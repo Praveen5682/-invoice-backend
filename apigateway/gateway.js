@@ -1,4 +1,4 @@
-const dbCheck = require("../middleware/dbcheck");
+const dbCheck = require("../middleware/dbCheck");
 const routes = require("../routes/index");
 
 module.exports = (app) => {
