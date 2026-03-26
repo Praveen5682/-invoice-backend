@@ -2,7 +2,7 @@ const dbCheck = require("../middleware/dbCheck");
 const routes = require("../routes/index");
 
 module.exports = (app) => {
-  // Dev and Live APIs
+  // Dev and Live API's
   app.use("/api/booking/v1/dev", dbCheck, routes);
   app.use("/api/booking/v1/live", dbCheck, routes);
 
