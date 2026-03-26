@@ -1,91 +1,76 @@
-# Bus Booking App Backend
+Bus Booking Backend
 
-A NodeJS server on EC2 to handle ticketing for a bus company.
+This is the backend API for the Bus Booking Application, built with Node.js, Express, and MySQL.
 
-## Context
-- 1 bus, 40 seats.
-- One ticket per seat.
+It is deployed on Render, and the database is hosted on Railway.
 
-## Features Included
-1. **Update Ticket Status**: Book an open seat by adding user details (name, email, phone).
-2. **View Ticket Status**: Fetch the status of a specific ticket/seat.
-3. **View Closed Tickets**: Fetch a list of all tickets currently booked.
-4. **View Open Tickets**: Fetch a list of all tickets currently available.
-5. **View User Details**: Fetch details of the person owning the ticket by seat ID.
-6. **Reset Server**: An admin API to reset the server, opening up all tickets for booking again.
+Features
+RESTful APIs for booking, tickets, and users
+Environment-specific configuration (development & production)
+Database migrations and seeds using Knex.js
+Health check endpoint (/)
 
-## Event-Driven Logic
-The server emits internal Node `EventEmitter` actions during core situations:
-- `ticketBooked`: Fired successfully when a seat is booked. The listener prints the user details.
-- `serverReset`: Fired when an admin resets all seats. 
+Tech Stack
+Node.js
+Express.js
+MySQL (via mysql2)
+Knex.js
+dotenv
+cors
 
-## Technology Stack
-- **Node.js** & **Express**: Web framework for APIs.
-- **MySQL2** & **Knex**: Used for database connectivity and schema building. Data persists in your local MySQL instance.
-- **Joi**: Object schema validation to securely validate HTTP request payloads.
+Setup (Local Development)
+Clone the repository:
 
-## Prerequisites
-- Node.js (v14+ recommended)
-- MySQL Server
+git clone https://github.com/Praveen5682/Bus_booking_backend.git
+cd Bus_booking_backend
 
-## Setup Instructions
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
+Install dependencies:
+npm install
 
-2. Configure your environment variables in `.env` located at the root directory:
-   ```env
-   DEV_DB_HOST=127.0.0.1
-   DEV_DB_USER=root
-   DEV_DB_PASSWORD=your_password
-   DEV_DB_NAME=bus_booking_app
-   DEV_DB_PORT=3306
-   ```
+Create a .env file with the following content:
 
-3. Ensure the `bus_booking_app` database exists in your MySQL server:
-   ```sql
-   CREATE DATABASE bus_booking_app;
-   ```
+# Local development
 
-4. Start the server (Development mode):
-   ```bash
-   npm run dev
-   ```
-   > **Note**: The application automatically checks for the `tickets` table on startup. If it doesn't exist, it creates it and seeds the database with 40 available open seats.
+NODE_ENV=development
 
-## API Endpoints (via `/api/ont/v1/dev`)
+DEV_DB_HOST=localhost
+DEV_DB_USER=root
+DEV_DB_PASSWORD=yourpassword
+DEV_DB_NAME=bus_booking
+DEV_DB_PORT=3306
 
-### 1. View Open Tickets
-- **GET** `/booking/tickets/open`
-- Returns a list of all available seats.
+# Production DB
 
-### 2. View Closed Tickets
-- **GET** `/booking/tickets/closed`
-- Returns a list of all booked seats.
+MYSQL_URL=mysql://root:oUUDvqrQpxLcnaLcMneUaOSKrhiLoYHe@crossover.proxy.rlwy.net:48011/
 
-### 3. View Specific Ticket Status
-- **GET** `/booking/tickets/:id/status`
-- Example: `/booking/tickets/1/status` returns whether seat 1 is open or closed.
+Run migrations and seeds:
+npx knex migrate:latest --knexfile utils/knexfile
+npx knex seed:run --knexfile utils/knexfile
 
-### 4. Book a Ticket
-- **PUT** `/booking/tickets/:id`
-- JSON Body:
-  ```json
-  {
-    "user_name": "John Doe",
-    "user_email": "john@example.com",
-    "user_phone": "1234567890"
-  }
-  ```
+Running the Server
+Development mode (with auto-reload):
+npm run dev
 
-### 5. View Seat Owner Details
-- **GET** `/booking/tickets/:id/user`
-- Returns the name, email, and phone of the person who booked the ticket (if closed).
+Production mode:
+npm start
 
-### 6. Admin Reset Server
-- **POST** `/booking/tickets/reset`
-- Clears all bookings and makes all 40 seats `open` again.
+Server will run on port 10000 by default.
 
-## Using the Postman Collection
-A pre-configured Postman Collection file `Bus_Booking_Postman_Collection.json` is located in the root repository. You can import this directly into Postman to easily execute and test the available REST APIs locally.
+API Endpoints
+Health Check
+GET / – returns { message: "Server Running Successfully!" }
+
+Dev APIs
+https://bus-booking-backend-vsw1.onrender.com/api/booking/v1/dev/...
+
+Live APIs
+https://bus-booking-backend-vsw1.onrender.com/api/booking/v1/live/...
+
+Notes
+Ensure MYSQL_URL is correctly configured for production deployments.
+Local development uses MySQL running on your machine.
+Backend is deployed on Render, database on Railway.
+
+GitHub Repository: Bus_booking_backend
+
+Deployed Backend URL: https://bus-booking-backend-vsw1.onrender.com
