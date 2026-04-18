@@ -1,0 +1,154 @@
+const db = require("../../../../config/db");
+const bcrypt = require("bcrypt");
+const { sendOtpEmail } = require("../../../../utils/mailer");
+
+// 🔹 Generate & Send OTP
+const issueOtp = async (email) => {
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+  await db("email_otps").where({ email }).del();
+
+  await db("email_otps").insert({
+    email,
+    otp,
+    expires_at: new Date(Date.now() + 10 * 60 * 1000),
+  });
+
+  await sendOtpEmail(email, otp);
+};
+
+// 🔹 Register
+module.exports.Registration = async ({ name, email, password }) => {
+  try {
+    const existing = await db("users").where({ email }).first();
+
+    if (existing) {
+      if (!existing.is_email_verified) {
+        await issueOtp(email);
+        return { status: true, message: "OTP sent again" };
+      }
+
+      return { status: false, message: "Email already registered" };
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const [userId] = await db("users").insert({
+      name,
+      email,
+      password: hashedPassword,
+      role: 1,
+      is_email_verified: 0,
+    });
+
+    await issueOtp(email);
+
+    return { status: true, userId, message: "OTP sent" };
+  } catch (err) {
+    console.error(err);
+    return { status: false, message: "Internal server error" };
+  }
+};
+
+// 🔹 Verify OTP
+module.exports.VerifyOtp = async ({ email, otp }) => {
+  try {
+    const user = await db("users").where({ email }).first();
+    if (!user) return { status: false, message: "User not found" };
+
+    if (user.is_email_verified)
+      return { status: false, message: "Already verified" };
+
+    const record = await db("email_otps").where({ email, otp }).first();
+
+    if (!record) return { status: false, message: "Invalid OTP" };
+
+    if (new Date() > new Date(record.expires_at))
+      return { status: false, message: "OTP expired" };
+
+    await db("users").where({ email }).update({ is_email_verified: 1 });
+    await db("email_otps").where({ email }).del();
+
+    return { status: true, message: "Email verified successfully" };
+  } catch (err) {
+    return { status: false, message: "Internal server error" };
+  }
+};
+
+// 🔹 Login
+module.exports.Login = async ({ email, password }) => {
+  try {
+    const user = await db("users").where({ email }).first();
+
+    if (!user) return { status: false, message: "Invalid email" };
+
+    if (!user.is_email_verified)
+      return { status: false, message: "Verify email first" };
+
+    const match = await bcrypt.compare(password, user.password);
+
+    if (!match) return { status: false, message: "Incorrect password" };
+
+    return {
+      status: true,
+      message: "Login successful",
+      userId: user.id,
+    };
+  } catch (err) {
+    return { status: false, message: "Internal server error" };
+  }
+};
+
+// 🔹 Resend OTP
+module.exports.ResendOtp = async ({ email }) => {
+  try {
+    const user = await db("users").where({ email }).first();
+
+    if (!user) return { status: false, message: "User not found" };
+
+    if (user.is_email_verified)
+      return { status: false, message: "Already verified" };
+
+    await issueOtp(email);
+
+    return { status: true, message: "OTP resent" };
+  } catch (err) {
+    return { status: false, message: "Internal server error" };
+  }
+};
+
+// 🔹 Forgot Password
+module.exports.ForgotPassword = async ({ email }) => {
+  try {
+    const user = await db("users").where({ email }).first();
+
+    if (user && user.is_email_verified) {
+      await issueOtp(email);
+    }
+
+    return { status: true, message: "If email exists, OTP sent" };
+  } catch (err) {
+    return { status: false, message: "Internal server error" };
+  }
+};
+
+// 🔹 Reset Password
+module.exports.ResetPassword = async ({ email, otp, newPassword }) => {
+  try {
+    const record = await db("email_otps").where({ email, otp }).first();
+
+    if (!record) return { status: false, message: "Invalid OTP" };
+
+    if (new Date() > new Date(record.expires_at))
+      return { status: false, message: "OTP expired" };
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+
+    await db("users").where({ email }).update({ password: hashed });
+    await db("email_otps").where({ email }).del();
+
+    return { status: true, message: "Password reset successful" };
+  } catch (err) {
+    return { status: false, message: "Internal server error" };
+  }
+};

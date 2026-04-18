@@ -14,6 +14,12 @@ module.exports = {
     },
     pool: { min: 2, max: 10 },
     debug: false,
+    migrations: {
+      directory: "../database/migrations",
+    },
+    seeds: {
+      directory: "../database/seeds",
+    },
   },
 
   production: {
@@ -21,5 +27,11 @@ module.exports = {
     connection: process.env.MYSQL_URL, // should be your Railway URL
     pool: { min: 2, max: 10 },
     debug: false,
+    migrations: {
+      directory: "../database/migrations",
+    },
+    seeds: {
+      directory: "../database/seeds",
+    },
   },
 };

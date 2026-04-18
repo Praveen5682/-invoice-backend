@@ -3,8 +3,9 @@ const routes = require("../routes/index");
 
 module.exports = (app) => {
   // Dev and Live API's
-  app.use("/api/booking/v1/dev", dbCheck, routes);
-  app.use("/api/booking/v1/live", dbCheck, routes);
+  app.use("/api/v1", dbCheck, routes);
+  app.use("/api/invoice/v1/dev", dbCheck, routes);
+  app.use("/api/invoice/v1/live", dbCheck, routes);
 
   // Health check
   app.get("/", (req, res) =>
