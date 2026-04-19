@@ -91,22 +91,15 @@ module.exports.login = async (req, res) => {
 
     const response = await service.Login(value);
 
-    if (!response.status) {
-      return res.status(401).json({
-        success: false,
-        message: response.message,
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
+    return res.status(response.code).json({
+      success: response.success,
       message: response.message,
-      data: {
-        userId: response.userId,
-      },
+      token: response.token || null,
+      user: response.user || null,
     });
   } catch (err) {
-    console.error("Login Error:", err);
+    console.error("Controller Error:", err);
+
     return res.status(500).json({
       success: false,
       message: "Login failed",

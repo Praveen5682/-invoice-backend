@@ -1,6 +1,7 @@
 const db = require("../../../../config/db");
 const bcrypt = require("bcrypt");
 const { sendOtpEmail } = require("../../../../utils/mailer");
+const jwt = require("jsonwebtoken");
 
 // 🔹 Generate & Send OTP
 const issueOtp = async (email) => {
@@ -80,25 +81,51 @@ module.exports.Login = async ({ email, password }) => {
   try {
     const user = await db("users").where({ email }).first();
 
-    if (!user) return { status: false, message: "Invalid email" };
+    if (!user) {
+      return { success: false, code: 401, message: "Invalid credentials" };
+    }
 
-    if (!user.is_email_verified)
-      return { status: false, message: "Verify email first" };
+    if (!user.is_email_verified) {
+      return {
+        success: false,
+        code: 403,
+        message: "Please verify your email first",
+      };
+    }
 
     const match = await bcrypt.compare(password, user.password);
 
-    if (!match) return { status: false, message: "Incorrect password" };
+    if (!match) {
+      return { success: false, code: 401, message: "Invalid credentials" };
+    }
+
+    const token = jwt.sign(
+      { id: user.id, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: "30d" },
+    );
 
     return {
-      status: true,
+      success: true,
+      code: 200,
       message: "Login successful",
-      userId: user.id,
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+      },
     };
   } catch (err) {
-    return { status: false, message: "Internal server error" };
+    console.error("Service Error:", err);
+
+    return {
+      success: false,
+      code: 500,
+      message: "Internal server error",
+    };
   }
 };
-
 // 🔹 Resend OTP
 module.exports.ResendOtp = async ({ email }) => {
   try {
