@@ -1,6 +1,5 @@
 const service = require("../service/index");
 
-// 🔹 Get Dashboard Overview
 module.exports.getOverview = async (req, res) => {
   try {
     const stats = await service.getStats();
@@ -24,7 +23,6 @@ module.exports.getOverview = async (req, res) => {
   }
 };
 
-// 🔹 Get Monthly Reports
 module.exports.getReports = async (req, res) => {
   try {
     const data = await service.getMonthlyReports();

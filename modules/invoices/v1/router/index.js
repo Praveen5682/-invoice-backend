@@ -1,11 +1,13 @@
 const express = require("express");
 const router = express.Router();
-const invoiceController = require("../controller");
+const Controller = require("../controller/index");
+const authCheck = require("../../../../middleware/authCheck");
 
-router.post("/", invoiceController.addInvoice);
-router.get("/", invoiceController.listInvoices);
-router.get("/:id", invoiceController.getInvoice);
-router.put("/:id", invoiceController.updateInvoice);
-router.delete("/:id", invoiceController.deleteInvoice);
+// Protected Invoice Routes
+router.get("/", authCheck, Controller.getAllInvoices);
+router.get("/:id", authCheck, Controller.getInvoiceById);
+router.post("/", authCheck, Controller.createInvoice);
+router.put("/:id", authCheck, Controller.updateInvoice);
+router.delete("/:id", authCheck, Controller.deleteInvoice);
 
 module.exports = router;

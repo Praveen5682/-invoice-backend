@@ -1,109 +1,76 @@
-const clientService = require("../service");
-const { validateClient } = require("../validator");
+const service = require("../service/index");
+const { createClientSchema, updateClientSchema } = require("../validator/index");
 
-// 🔹 Add Client
-module.exports.addClient = async (req, res) => {
-  try {
-    const { success, errors, value } = validateClient(req.body);
-    if (!success) {
-      return res.status(400).json({
-        success: false,
-        message: "Validation failed.",
-        errors: errors,
-      });
+module.exports.getAllClients = async (req, res) => {
+    try {
+        const clients = await service.getAllClients();
+        return res.status(200).json({ success: true, data: clients });
+    } catch (err) {
+        console.error("Client Controller Error:", err);
+        return res.status(500).json({ success: false, message: "Failed to fetch clients." });
     }
-
-    const data = await clientService.createClient(value);
-    return res.status(201).json({
-      success: true,
-      message: "Client created successfully.",
-      data,
-    });
-  } catch (error) {
-    console.error("Controller Error (addClient):", error);
-    return res.status(error.statusCode || 500).json({
-      success: false,
-      message: error.message || "Internal server error while adding client.",
-    });
-  }
 };
 
-// 🔹 List Clients
-module.exports.listClients = async (req, res) => {
-  try {
-    const data = await clientService.getClients();
-    return res.status(200).json({
-      success: true,
-      message: "Clients fetched successfully.",
-      data,
-    });
-  } catch (error) {
-    console.error("Controller Error (listClients):", error);
-    return res.status(500).json({
-      success: false,
-      message: error.message || "Failed to retrieve clients.",
-    });
-  }
+module.exports.getClientById = async (req, res) => {
+    try {
+        const client = await service.getClientById(req.params.id);
+        if (!client) {
+            return res.status(404).json({ success: false, message: "Client not found." });
+        }
+        return res.status(200).json({ success: true, data: client });
+    } catch (err) {
+        console.error("Client Controller Error:", err);
+        return res.status(500).json({ success: false, message: "Failed to fetch client." });
+    }
 };
 
-// 🔹 Get Client
-module.exports.getClient = async (req, res) => {
-  try {
-    const data = await clientService.getClientById(req.params.id);
-    return res.status(200).json({
-      success: true,
-      message: "Client profile retrieved successfully.",
-      data,
-    });
-  } catch (error) {
-    console.error(`Controller Error (getClient - ${req.params.id}):`, error);
-    return res.status(error.statusCode || 500).json({
-      success: false,
-      message: error.message || "Could not fetch client details.",
-    });
-  }
+module.exports.createClient = async (req, res) => {
+    try {
+        const { error, value } = createClientSchema.validate(req.body);
+        if (error) {
+            return res.status(400).json({ success: false, message: error.details[0].message });
+        }
+        
+        const response = await service.createClient(value);
+        if (!response.status) {
+            return res.status(400).json({ success: false, message: response.message });
+        }
+        
+        return res.status(201).json({ success: true, message: "Client created successfully.", data: response.data });
+    } catch (err) {
+        console.error("Client Controller Error:", err);
+        return res.status(500).json({ success: false, message: "Failed to create client." });
+    }
 };
 
-// 🔹 Update Client
 module.exports.updateClient = async (req, res) => {
-  try {
-    const { success, errors, value } = validateClient(req.body);
-    if (!success) {
-      return res.status(400).json({
-        success: false,
-        message: "Validation failed.",
-        errors: errors,
-      });
+    try {
+        const { error, value } = updateClientSchema.validate(req.body);
+        if (error) {
+            return res.status(400).json({ success: false, message: error.details[0].message });
+        }
+        
+        const response = await service.updateClient(req.params.id, value);
+        if (!response.status) {
+            return res.status(400).json({ success: false, message: response.message });
+        }
+        
+        return res.status(200).json({ success: true, message: "Client updated successfully.", data: response.data });
+    } catch (err) {
+        console.error("Client Controller Error:", err);
+        return res.status(500).json({ success: false, message: "Failed to update client." });
     }
-
-    const data = await clientService.updateClient(req.params.id, value);
-    return res.status(200).json({
-      success: true,
-      message: "Client updated successfully.",
-      data,
-    });
-  } catch (error) {
-    console.error(`Controller Error (updateClient - ${req.params.id}):`, error);
-    return res.status(error.statusCode || 500).json({
-      success: false,
-      message: error.message || "Failed to update client profile.",
-    });
-  }
 };
 
-// 🔹 Delete Client
 module.exports.deleteClient = async (req, res) => {
-  try {
-    await clientService.deleteClient(req.params.id);
-    return res.status(200).json({
-      success: true,
-      message: "Client and all associated data deleted successfully.",
-    });
-  } catch (error) {
-    console.error(`Controller Error (deleteClient - ${req.params.id}):`, error);
-    return res.status(error.statusCode || 500).json({
-      success: false,
-      message: error.message || "Error occurred during client deletion.",
-    });
-  }
+    try {
+        const response = await service.deleteClient(req.params.id);
+        if (!response.status) {
+            return res.status(400).json({ success: false, message: response.message });
+        }
+        return res.status(200).json({ success: true, message: "Client deleted successfully." });
+    } catch (err) {
+        console.error("Client Controller Error:", err);
+        return res.status(500).json({ success: false, message: "Failed to delete client." });
+    }
 };

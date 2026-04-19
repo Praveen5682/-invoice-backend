@@ -1,11 +1,13 @@
 const express = require("express");
 const router = express.Router();
-const clientController = require("../controller");
+const Controller = require("../controller/index");
+const authCheck = require("../../../../middleware/authCheck");
 
-router.post("/", clientController.addClient);
-router.get("/", clientController.listClients);
-router.get("/:id", clientController.getClient);
-router.put("/:id", clientController.updateClient);
-router.delete("/:id", clientController.deleteClient);
+// Protected Client Routes
+router.get("/", authCheck, Controller.getAllClients);
+router.get("/:id", authCheck, Controller.getClientById);
+router.post("/", authCheck, Controller.createClient);
+router.put("/:id", authCheck, Controller.updateClient);
+router.delete("/:id", authCheck, Controller.deleteClient);
 
 module.exports = router;

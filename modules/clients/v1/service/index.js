@@ -1,107 +1,69 @@
 const db = require("../../../../config/db");
 
-// 🔹 Create Client
-module.exports.createClient = async (props = {}) => {
-  const { name, email, phone, address } = props;
-  try {
-    // Check if client with email exists
-    const existing = await db("clients").where({ email }).first();
-    if (existing) {
-      const error = new Error("A client with this email already exists.");
-      error.statusCode = 409;
-      throw error;
+module.exports.getAllClients = async () => {
+    try {
+        const clients = await db("clients").select("*").orderBy("created_at", "desc");
+        return clients;
+    } catch (err) {
+        console.error("Service Error:", err);
+        throw new Error("Failed to fetch clients from database");
     }
-
-    const [id] = await db("clients").insert({
-      name,
-      email,
-      phone,
-      address,
-    });
-
-    return await db("clients").where({ id }).first();
-  } catch (error) {
-    console.error("Service Error (createClient):", error);
-    throw error; // Let the controller handle it
-  }
 };
 
-// 🔹 Get All Clients
-module.exports.getClients = async () => {
-  try {
-    return await db("clients").orderBy("created_at", "desc");
-  } catch (error) {
-    console.error("Service Error (getClients):", error);
-    throw new Error("Failed to fetch clients from database.");
-  }
-};
-
-// 🔹 Get Client by ID
 module.exports.getClientById = async (id) => {
-  try {
-    const client = await db("clients").where({ id }).first();
-    if (!client) {
-      const error = new Error("Client not found.");
-      error.statusCode = 404;
-      throw error;
+    try {
+        const client = await db("clients").where({ id }).first();
+        return client;
+    } catch (err) {
+        console.error("Service Error:", err);
+        throw new Error("Failed to fetch client from database");
     }
-    return client;
-  } catch (error) {
-    console.error(`Service Error (getClientById - ${id}):`, error);
-    throw error;
-  }
 };
 
-// 🔹 Update Client
-module.exports.updateClient = async (id, props = {}) => {
-  const { name, email, phone, address } = props;
-  try {
-    const client = await db("clients").where({ id }).first();
-    if (!client) {
-      const error = new Error("Client not found.");
-      error.statusCode = 404;
-      throw error;
+module.exports.createClient = async (data) => {
+    try {
+        const existing = await db("clients").where({ email: data.email }).first();
+        if (existing) {
+            return { status: false, message: "Client with this email already exists." };
+        }
+        const [id] = await db("clients").insert(data);
+        const newClient = await db("clients").where({ id }).first();
+        return { status: true, data: newClient };
+    } catch (err) {
+        console.error("Service Error:", err);
+        return { status: false, message: "Internal server error" };
     }
-
-    // Check for email collision if email is changing
-    if (email && email !== client.email) {
-      const existing = await db("clients").where({ email }).first();
-      if (existing) {
-        const error = new Error("This email is already taken by another client.");
-        error.statusCode = 409;
-        throw error;
-      }
-    }
-
-    await db("clients").where({ id }).update({
-      name,
-      email,
-      phone,
-      address,
-      updated_at: db.fn.now(),
-    });
-
-    return await db("clients").where({ id }).first();
-  } catch (error) {
-    console.error(`Service Error (updateClient - ${id}):`, error);
-    throw error;
-  }
 };
 
-// 🔹 Delete Client
+module.exports.updateClient = async (id, data) => {
+    try {
+        if (data.email) {
+            const existing = await db("clients").where({ email: data.email }).whereNot({ id }).first();
+            if (existing) {
+                return { status: false, message: "Another client with this email already exists." };
+            }
+        }
+        const updated = await db("clients").where({ id }).update(data);
+        if (!updated) {
+            return { status: false, message: "Client not found." };
+        }
+        const updatedClient = await db("clients").where({ id }).first();
+        return { status: true, data: updatedClient };
+    } catch (err) {
+        console.error("Service Error:", err);
+        return { status: false, message: "Internal server error" };
+    }
+};
+
 module.exports.deleteClient = async (id) => {
-  try {
-    const client = await db("clients").where({ id }).first();
-    if (!client) {
-      const error = new Error("Client not found.");
-      error.statusCode = 404;
-      throw error;
+    try {
+        const deleted = await db("clients").where({ id }).del();
+        if (!deleted) {
+            return { status: false, message: "Client not found." };
+        }
+        return { status: true, message: "Client deleted successfully." };
+    } catch (err) {
+        console.error("Service Error:", err);
+        return { status: false, message: "Internal server error" };
     }
-
-    await db("clients").where({ id }).del();
-    return true;
-  } catch (error) {
-    console.error(`Service Error (deleteClient - ${id}):`, error);
-    throw error;
-  }
 };

@@ -1,149 +1,169 @@
 const db = require("../../../../config/db");
 
-// 🔹 Create Invoice
-module.exports.createInvoice = async (props = {}) => {
-  const { 
-    invoice_no, client_id, status, total_amount, 
-    issue_date, due_date, notes, items 
-  } = props;
+module.exports.getAllInvoices = async () => {
+  try {
+    const invoices = await db("invoices")
+      .leftJoin("clients", "invoices.client_id", "clients.id")
+      .select(
+        "invoices.id as id",
+        "invoices.invoice_no",
+        "invoices.client_id",
+        "invoices.status",
+        "invoices.total_amount",
+        "invoices.issue_date",
+        "invoices.due_date",
+        "invoices.notes",
+        "invoices.created_at",
+        "invoices.updated_at",
+        "invoices.currency",
+        "invoices.subtotal",
+        "invoices.discount_type",
+        "invoices.discount_value",
+        "invoices.shipping_charge",
+        "invoices.gst_rate",
+        "invoices.gst_amount",
+        "invoices.tds_rate",
+        "invoices.tds_amount",
+        "invoices.amount_paid",
+        "invoices.balance_due",
+        "invoices.payment_terms",
+        "invoices.terms",
+        "invoices.bank_details",
+
+
+        "clients.name",
+        "clients.email",
+        "clients.phone",
+        "clients.address",
+      )
+      .orderBy("invoices.created_at", "desc");
+    return invoices;
+  } catch (err) {
+    console.error("Service Error:", err);
+    throw new Error("Failed to fetch invoices");
+  }
+};
+
+module.exports.getInvoiceById = async (id) => {
+  try {
+    const invoice = await db("invoices")
+      .leftJoin("clients", "invoices.client_id", "clients.id")
+      .select(
+        "invoices.id as id",
+        "invoices.*",
+        "clients.name",
+        "clients.email",
+        "clients.phone",
+        "clients.address",
+      )
+      .where({ "invoices.id": id })
+      .first();
+    if (!invoice) return null;
+
+    const items = await db("invoice_items").where({ invoice_id: id });
+    invoice.items = items;
+    return invoice;
+  } catch (err) {
+    console.error("Service Error:", err);
+    throw new Error("Failed to fetch invoice");
+  }
+};
+
+module.exports.createInvoice = async (data) => {
+  const trx = await db.transaction();
 
   try {
-    // 1. Check if client exists
-    const client = await db("clients").where({ id: client_id }).first();
-    if (!client) {
-      const error = new Error("The selected client does not exist.");
-      error.statusCode = 404;
-      throw error;
+    const existing = await trx("invoices")
+      .where({ invoice_no: data.invoice_no })
+      .first();
+
+    if (existing) {
+      await trx.rollback();
+      return { status: false, message: "Invoice number already exists" };
     }
 
-    // 2. Check for duplicate invoice number
-    const existingInvoice = await db("invoices").where({ invoice_no }).first();
-    if (existingInvoice) {
-      const error = new Error(`Invoice number "${invoice_no}" is already in use.`);
-      error.statusCode = 409;
-      throw error;
-    }
+    const { items, client, bank_details, signature, ...invoiceData } = data;
 
-    let createdInvoice;
+    // Handle JSON fields
+    if (bank_details) invoiceData.bank_details = JSON.stringify(bank_details);
+    if (signature) invoiceData.signature = JSON.stringify(signature);
 
-    await db.transaction(async (trx) => {
-      // 3. Insert Invoice
-      const [invoiceId] = await trx("invoices").insert({
-        invoice_no,
-        client_id,
-        status,
-        total_amount,
-        issue_date,
-        due_date,
-        notes,
-      });
+    const [invoiceId] = await trx("invoices").insert(invoiceData);
 
-      // 4. Insert Invoice Items
-      const itemsToInsert = items.map(item => ({
+    if (items && items.length > 0) {
+      const itemsToInsert = items.map((item) => ({
         invoice_id: invoiceId,
         description: item.description,
         quantity: item.quantity,
         unit_price: item.unit_price,
-        amount: item.amount
+        tax_rate: item.tax_rate || 0,
+        amount: item.amount,
       }));
-
       await trx("invoice_items").insert(itemsToInsert);
-
-      createdInvoice = await trx("invoices").where({ id: invoiceId }).first();
-    });
-
-    return createdInvoice;
-  } catch (error) {
-    console.error("Service Error (createInvoice):", error);
-    throw error;
-  }
-};
-
-// 🔹 Get All Invoices (with Client Info)
-module.exports.getInvoices = async () => {
-  try {
-    return await db("invoices as i")
-      .join("clients as c", "i.client_id", "c.id")
-      .select(
-        "i.*",
-        "c.name as client_name",
-        "c.email as client_email"
-      )
-      .orderBy("i.created_at", "desc");
-  } catch (error) {
-    console.error("Service Error (getInvoices):", error);
-    throw new Error("Failed to retrieve invoices from database.");
-  }
-};
-
-// 🔹 Get Invoice by ID (with Items and Client Info)
-module.exports.getInvoiceById = async (id) => {
-  try {
-    const invoice = await db("invoices as i")
-      .join("clients as c", "i.client_id", "c.id")
-      .select(
-        "i.*",
-        "c.name as client_name",
-        "c.email as client_email",
-        "c.phone as client_phone",
-        "c.address as client_address"
-      )
-      .where("i.id", id)
-      .first();
-
-    if (!invoice) {
-        const error = new Error("Invoice not found.");
-        error.statusCode = 404;
-        throw error;
     }
 
-    const items = await db("invoice_items").where({ invoice_id: id });
-    return { ...invoice, items };
-  } catch (error) {
-    console.error(`Service Error (getInvoiceById - ${id}):`, error);
-    throw error;
+    await trx.commit();
+    const invoice = await this.getInvoiceById(invoiceId);
+    return { status: true, data: invoice };
+  } catch (err) {
+    await trx.rollback();
+    console.error("Create Invoice Error:", err);
+    return { status: false, message: "Internal server error" };
   }
 };
 
-// 🔹 Update Invoice
-module.exports.updateInvoice = async (id, props = {}) => {
-  const { status, due_date, notes } = props;
+module.exports.updateInvoice = async (id, data) => {
+  const trx = await db.transaction();
   try {
-    const invoice = await db("invoices").where({ id }).first();
-    if (!invoice) {
-        const error = new Error("Invoice not found.");
-        error.statusCode = 404;
-        throw error;
+    const { items, client, bank_details, signature, ...invoiceData } = data;
+
+    // Handle JSON fields
+    if (bank_details) invoiceData.bank_details = JSON.stringify(bank_details);
+    if (signature) invoiceData.signature = JSON.stringify(signature);
+
+    const updated = await trx("invoices").where({ id }).update(invoiceData);
+
+    if (!updated) {
+      await trx.rollback();
+      return { status: false, message: "Invoice not found" };
     }
 
-    await db("invoices").where({ id }).update({
-      status,
-      due_date,
-      notes,
-      updated_at: db.fn.now(),
-    });
+    if (items) {
+      // Sync items: Delete existing and re-insert new
+      await trx("invoice_items").where({ invoice_id: id }).del();
 
-    return await db("invoices").where({ id }).first();
-  } catch (error) {
-    console.error(`Service Error (updateInvoice - ${id}):`, error);
-    throw error;
+      if (items.length > 0) {
+        const itemsToInsert = items.map((item) => ({
+          invoice_id: id,
+          description: item.description,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          tax_rate: item.tax_rate || 0,
+          amount: item.amount,
+        }));
+        await trx("invoice_items").insert(itemsToInsert);
+      }
+    }
+
+    await trx.commit();
+    const updatedInvoice = await this.getInvoiceById(id);
+    return { status: true, data: updatedInvoice };
+  } catch (err) {
+    await trx.rollback();
+    console.error("Update Invoice Error:", err);
+    return { status: false, message: "Internal server error" };
   }
 };
 
-// 🔹 Delete Invoice
 module.exports.deleteInvoice = async (id) => {
   try {
-    const invoice = await db("invoices").where({ id }).first();
-    if (!invoice) {
-        const error = new Error("Invoice not found.");
-        error.statusCode = 404;
-        throw error;
+    const deleted = await db("invoices").where({ id }).del();
+    if (!deleted) {
+      return { status: false, message: "Invoice not found" };
     }
-
-    await db("invoices").where({ id }).del();
-    return true;
-  } catch (error) {
-    console.error(`Service Error (deleteInvoice - ${id}):`, error);
-    throw error;
+    return { status: true, message: "Invoice deleted successfully" };
+  } catch (err) {
+    console.error("Service Error:", err);
+    return { status: false, message: "Internal server error" };
   }
 };

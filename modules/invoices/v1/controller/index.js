@@ -1,102 +1,118 @@
-const invoiceService = require("../service");
-const { validateInvoice } = require("../validator");
+const service = require("../service/index");
+const {
+  createInvoiceSchema,
+  updateInvoiceSchema,
+} = require("../validator/index");
 
-// 🔹 Add Invoice
-module.exports.addInvoice = async (req, res) => {
+module.exports.getAllInvoices = async (req, res) => {
   try {
-    const { success, errors, value } = validateInvoice(req.body);
-    if (!success) {
+    const invoices = await service.getAllInvoices();
+    return res.status(200).json({ success: true, data: invoices });
+  } catch (err) {
+    console.error("Invoice Controller Error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch invoices." });
+  }
+};
+
+module.exports.getInvoiceById = async (req, res) => {
+  try {
+    const invoice = await service.getInvoiceById(req.params.id);
+    if (!invoice) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Invoice not found." });
+    }
+    return res.status(200).json({ success: true, data: invoice });
+  } catch (err) {
+    console.error("Invoice Controller Error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch invoice." });
+  }
+};
+
+module.exports.createInvoice = async (req, res) => {
+  try {
+    const { error, value } = createInvoiceSchema.validate(req.body, {
+      abortEarly: false,
+    });
+
+    if (error) {
       return res.status(400).json({
         success: false,
-        message: "Validation failed.",
-        errors: errors,
+        message: error.details.map((e) => e.message).join(", "),
       });
     }
 
-    const data = await invoiceService.createInvoice(value);
+    const result = await service.createInvoice(value);
+
+    if (!result.status) {
+      return res.status(400).json({
+        success: false,
+        message: result.message,
+      });
+    }
+
     return res.status(201).json({
       success: true,
-      message: "Invoice created and saved successfully.",
-      data,
+      message: "Invoice created successfully",
+      data: result.data,
     });
-  } catch (error) {
-    console.error("Controller Error (addInvoice):", error);
-    return res.status(error.statusCode || 500).json({
-      success: false,
-      message: error.message || "An error occurred while generating the invoice.",
-    });
-  }
-};
-
-// 🔹 List Invoices
-module.exports.listInvoices = async (req, res) => {
-  try {
-    const data = await invoiceService.getInvoices();
-    return res.status(200).json({
-      success: true,
-      message: "Invoices retrieved successfully.",
-      data,
-    });
-  } catch (error) {
-    console.error("Controller Error (listInvoices):", error);
+  } catch (err) {
+    console.error("Create Invoice Error:", err);
     return res.status(500).json({
       success: false,
-      message: error.message || "Failed to fetch invoices list.",
+      message: "Internal server error",
     });
   }
 };
 
-// 🔹 Get Invoice
-module.exports.getInvoice = async (req, res) => {
-  try {
-    const data = await invoiceService.getInvoiceById(req.params.id);
-    return res.status(200).json({
-      success: true,
-      message: "Invoice details retrieved.",
-      data,
-    });
-  } catch (error) {
-    console.error(`Controller Error (getInvoice - ${req.params.id}):`, error);
-    return res.status(error.statusCode || 500).json({
-      success: false,
-      message: error.message || "Could not retrieve invoice details.",
-    });
-  }
-};
-
-// 🔹 Update Invoice
 module.exports.updateInvoice = async (req, res) => {
   try {
-    // Note: Validation might be different for partial updates, 
-    // but here we reuse the main validator for simplicity or we can relax it.
-    const data = await invoiceService.updateInvoice(req.params.id, req.body);
+    const { error, value } = updateInvoiceSchema.validate(req.body);
+    if (error) {
+      return res
+        .status(400)
+        .json({ success: false, message: error.details[0].message });
+    }
+
+    const response = await service.updateInvoice(req.params.id, value);
+    if (!response.status) {
+      return res
+        .status(400)
+        .json({ success: false, message: response.message });
+    }
+
     return res.status(200).json({
       success: true,
-      message: "Invoice status/details updated.",
-      data,
+      message: "Invoice updated successfully.",
+      data: response.data,
     });
-  } catch (error) {
-    console.error(`Controller Error (updateInvoice - ${req.params.id}):`, error);
-    return res.status(error.statusCode || 500).json({
-      success: false,
-      message: error.message || "Failed to update the invoice.",
-    });
+  } catch (err) {
+    console.error("Invoice Controller Error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to update invoice." });
   }
 };
 
-// 🔹 Delete Invoice
 module.exports.deleteInvoice = async (req, res) => {
   try {
-    await invoiceService.deleteInvoice(req.params.id);
-    return res.status(200).json({
-      success: true,
-      message: "Invoice has been permanently deleted.",
-    });
-  } catch (error) {
-    console.error(`Controller Error (deleteInvoice - ${req.params.id}):`, error);
-    return res.status(error.statusCode || 500).json({
-      success: false,
-      message: error.message || "Error while deleting the invoice.",
-    });
+    const response = await service.deleteInvoice(req.params.id);
+    if (!response.status) {
+      return res
+        .status(400)
+        .json({ success: false, message: response.message });
+    }
+    return res
+      .status(200)
+      .json({ success: true, message: "Invoice deleted successfully." });
+  } catch (err) {
+    console.error("Invoice Controller Error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to delete invoice." });
   }
 };

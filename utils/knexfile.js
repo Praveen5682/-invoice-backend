@@ -15,7 +15,7 @@ module.exports = {
     pool: { min: 2, max: 10 },
     debug: false,
     migrations: {
-      directory: "../database/migrations",
+      directory: "./migrations",
     },
     seeds: {
       directory: "../database/seeds",
@@ -28,7 +28,7 @@ module.exports = {
     pool: { min: 2, max: 10 },
     debug: false,
     migrations: {
-      directory: "../database/migrations",
+      directory: "./migrations",
     },
     seeds: {
       directory: "../database/seeds",

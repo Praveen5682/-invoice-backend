@@ -1,116 +1,95 @@
 const db = require("../../../../config/db");
 
-// 🔹 Get Aggregate Statistics
 module.exports.getStats = async () => {
   try {
-    const totalInvoices = await db("invoices").count("id as count").first();
-    const totalClients = await db("clients").count("id as count").first();
-
-    const revenueStats = await db("invoices")
-      .select(
-        db.raw(
-          "SUM(CASE WHEN status = 'paid' THEN total_amount ELSE 0 END) as total_revenue",
-        ),
-        db.raw(
-          "SUM(CASE WHEN status = 'pending' THEN total_amount ELSE 0 END) as pending_amount",
-        ),
-        db.raw(
-          "SUM(CASE WHEN status = 'overdue' THEN total_amount ELSE 0 END) as overdue_amount",
-        ),
-      )
-      .first();
-
-    const stats = revenueStats || {
-      total_revenue: 0,
-      pending_amount: 0,
-      overdue_amount: 0,
-    };
+    const [totalRevenueResult] = await db("invoices")
+      .sum("total_amount as sum")
+      .where({ status: "paid" });
+    const [pendingAmountResult] = await db("invoices")
+      .sum("total_amount as sum")
+      .where({ status: "pending" });
+    const [overdueAmountResult] = await db("invoices")
+      .sum("total_amount as sum")
+      .where({ status: "overdue" });
+    const [invoicesCountResult] = await db("invoices").count("id as count");
+    const [activeClientsResult] = await db("clients").count("id as count");
 
     return {
-      total_invoices: totalInvoices.count || 0,
-      total_clients: totalClients.count || 0,
-      total_revenue: stats.total_revenue || 0,
-      pending_amount: stats.pending_amount || 0,
-      overdue_amount: stats.overdue_amount || 0,
+      total_invoices: invoicesCountResult?.count || 0,
+      total_revenue: totalRevenueResult?.sum || 0,
+      pending_amount: pendingAmountResult?.sum || 0,
+      overdue_amount: overdueAmountResult?.sum || 0,
+      total_clients: activeClientsResult?.count || 0,
     };
-  } catch (error) {
-    console.error("Dashboard Service Error (getStats):", error);
-    throw error;
+  } catch (err) {
+    console.error("Dashboard Service Error (getStats):", err);
+    throw err;
   }
 };
 
-// 🔹 Get 6-Month Revenue Data for Chart
 module.exports.getChartData = async () => {
   try {
-    // Note: MySQL specific query for last 6 months
     const data = await db("invoices")
       .select(
-        db.raw("DATE_FORMAT(issue_date, '%b') as month"),
+        db.raw("DATE_FORMAT(issue_date, '%M') as month"),
         db.raw("SUM(total_amount) as amount"),
       )
-      .where(
-        "issue_date",
-        ">=",
-        db.raw("DATE_SUB(CURDATE(), INTERVAL 6 MONTH)"),
-      )
-      .where("status", "paid")
-      .groupByRaw("DATE_FORMAT(issue_date, '%b')")
-      .orderByRaw("MIN(issue_date) ASC");
+      .groupBy("month")
+      .orderByRaw("MIN(issue_date) ASC")
+      .limit(6);
+
     return data;
-  } catch (error) {
-    console.error("Dashboard Service Error (getChartData):", error);
-    throw error;
+  } catch (err) {
+    console.error("Dashboard Service Error (getChartData):", err);
+    return [];
   }
 };
 
-// 🔹 Get Monthly Report Aggregates
-module.exports.getMonthlyReports = async () => {
-  try {
-    const data = await db("invoices")
-      .select(
-        db.raw("DATE_FORMAT(issue_date, '%M %Y') as period"),
-        db.raw("COUNT(id) as invoice_count"),
-        db.raw("SUM(total_amount) as total_amount"),
-        db.raw(
-          "SUM(CASE WHEN status = 'paid' THEN total_amount ELSE 0 END) as paid_amount",
-        ),
-        db.raw(
-          "SUM(CASE WHEN status != 'paid' THEN total_amount ELSE 0 END) as pending_amount",
-        ),
-      )
-      .groupByRaw("period")
-      .orderBy("issue_date", "desc");
-
-    return data;
-  } catch (error) {
-    console.error("Dashboard Service Error (getMonthlyReports):", error);
-    throw error;
-  }
-};
-
-// 🔹 Get Overdue Reminders
 module.exports.getOverdueReminders = async () => {
   try {
-    const data = await db("reminders")
-      .join("invoices", "reminders.invoice_id", "invoices.id")
-      .join("clients", "invoices.client_id", "clients.id")
+    const reminders = await db("invoices")
+      .leftJoin("clients", "invoices.client_id", "clients.id")
       .select(
-        "reminders.id",
-        "reminders.reminder_date",
-        "reminders.status",
-        "invoices.invoice_no",
-        "invoices.total_amount",
+        "invoices.id",
         "clients.name as client_name",
-        "clients.email as client_email",
+        "invoices.total_amount",
+        "invoices.due_date as reminder_date",
+        "invoices.id as invoice_id",
       )
-      .where("reminders.reminder_date", "<", db.fn.now())
-      .where("reminders.status", "!=", "sent")
-      .orderBy("reminders.reminder_date", "desc")
-      .limit(10);
+      .where({ "invoices.status": "overdue" })
+      .orderBy("invoices.due_date", "asc")
+      .limit(5);
+
+    return reminders;
+  } catch (err) {
+    console.error("Dashboard Service Error (getOverdueReminders):", err);
+    return [];
+  }
+};
+
+module.exports.getMonthlyReports = async () => {
+  try {
+    const currentYear = new Date().getFullYear();
+
+    const data = await db("invoices")
+      .select(
+        db.raw("DATE_FORMAT(issue_date, '%M %Y') as period"), // was: month → period
+        db.raw("COUNT(id) as invoice_count"), // was: missing entirely
+        db.raw("SUM(total_amount) as total_amount"), // was: invoiceGenerated
+        db.raw(
+          "SUM(CASE WHEN status = 'paid' THEN total_amount ELSE 0 END) as paid_amount", // was: revenueCollected
+        ),
+        db.raw(
+          "SUM(CASE WHEN status IN ('pending', 'overdue') THEN total_amount ELSE 0 END) as pending_amount", // was: pendingDues (now includes overdue)
+        ),
+      )
+      .whereRaw(`YEAR(issue_date) = ?`, [currentYear])
+      .groupByRaw("DATE_FORMAT(issue_date, '%M %Y')")
+      .orderByRaw("MIN(issue_date) DESC");
 
     return data;
-  } catch (error) {
-    console.error("Dashboard Service Error (getOverdueReminders):", error);
-    throw error;
+  } catch (err) {
+    console.error("Dashboard Service Error (getMonthlyReports):", err);
+    return [];
   }
 };

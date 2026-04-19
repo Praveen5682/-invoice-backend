@@ -1,50 +1,141 @@
 const Joi = require("joi");
 
 const invoiceItemSchema = Joi.object({
-  description: Joi.string().trim().required().messages({
-    "string.empty": "Item description is required.",
-  }),
-  quantity: Joi.number().integer().min(1).required().messages({
-    "number.base": "Quantity must be a number.",
-    "number.min": "Quantity must be at least 1.",
-  }),
-  unit_price: Joi.number().min(0).required().messages({
-    "number.base": "Unit price must be a number.",
-    "number.min": "Unit price cannot be negative.",
-  }),
-  amount: Joi.number().min(0).required().messages({
-    "number.base": "Amount must be a number.",
-  }),
-});
-
-const invoiceSchema = Joi.object({
-  invoice_no: Joi.string().trim().required().messages({
-    "string.empty": "Invoice number is required.",
-  }),
-  client_id: Joi.number().integer().required().messages({
-    "number.base": "Please select a valid client.",
-  }),
-  status: Joi.string().valid("paid", "pending", "overdue", "draft").default("pending"),
-  total_amount: Joi.number().min(0).required().messages({
-    "number.base": "Total amount must be a number.",
-  }),
-  issue_date: Joi.date().required().messages({
-    "date.base": "Please provide a valid issue date.",
-  }),
-  due_date: Joi.date().allow(null).messages({
-    "date.base": "Please provide a valid due date.",
-  }),
-  notes: Joi.string().trim().allow("", null),
-  items: Joi.array().items(invoiceItemSchema).min(1).required().messages({
-    "array.min": "At least one invoice item is required.",
-  }),
-});
-
-module.exports.validateInvoice = (data) => {
-  const { error, value } = invoiceSchema.validate(data, { abortEarly: false });
-  if (error) {
-    const errorDetails = error.details.map((detail) => detail.message);
-    return { success: false, errors: errorDetails };
+  description: Joi.string().trim().required(),
+  quantity: Joi.number().integer().min(1).required(),
+  unit_price: Joi.number().min(0).required(),
+  tax_rate: Joi.number().min(0).max(100).default(0),
+  amount: Joi.number().min(0).required(),
+}).custom((value, helpers) => {
+  const expected = value.quantity * value.unit_price;
+  if (Math.abs(value.amount - expected) > 0.01) {
+    return helpers.error("any.invalid", {
+      message: "Amount must equal quantity × unit_price",
+    });
   }
-  return { success: true, value };
+  return value;
+});
+
+const createInvoiceSchema = Joi.object({
+  invoice_no: Joi.string().trim().required(),
+  client_id: Joi.number().integer().required(),
+
+  status: Joi.string()
+    .valid("paid", "pending", "overdue", "draft")
+    .default("pending"),
+
+  currency: Joi.string().valid("INR", "USD", "EUR", "GBP").default("INR"),
+
+  subtotal: Joi.number().min(0).required(),
+  discount_type: Joi.string().valid("pct", "flat").default("pct"),
+  discount_value: Joi.number().min(0).default(0),
+
+  shipping_charge: Joi.number().min(0).default(0),
+
+  gst_rate: Joi.number().min(0).max(100).default(0),
+  gst_amount: Joi.number().min(0).default(0),
+
+  tds_rate: Joi.number().min(0).max(100).default(0),
+  tds_amount: Joi.number().min(0).default(0),
+
+  total_amount: Joi.number().min(0).required(),
+
+  amount_paid: Joi.number().min(0).default(0),
+  balance_due: Joi.number().min(0).required(),
+
+  issue_date: Joi.date().iso().required(),
+  due_date: Joi.date().iso().allow(null, ""),
+
+  payment_terms: Joi.string().allow(null, ""),
+
+  notes: Joi.string().allow(null, ""),
+  terms: Joi.string().allow(null, ""),
+
+  // ==================== OPTIONAL FIELDS ====================
+  client: Joi.object({
+    name: Joi.string().allow("", null),
+    email: Joi.string().email().allow("", null),
+    phone: Joi.string().allow("", null),
+    website: Joi.string().allow("", null),
+    gstin: Joi.string().allow("", null),
+    pan: Joi.string().allow("", null),
+    place_of_supply: Joi.string().allow("", null),
+    billing_address: Joi.object({
+      line1: Joi.string().allow("", null),
+      line2: Joi.string().allow("", null),
+      city: Joi.string().allow("", null),
+      state: Joi.string().allow("", null),
+      pincode: Joi.string().allow("", null),
+      country: Joi.string().allow("", null),
+    }).optional(),
+    shipping_address: Joi.object({
+      line1: Joi.string().allow("", null),
+      line2: Joi.string().allow("", null),
+      city: Joi.string().allow("", null),
+      state: Joi.string().allow("", null),
+      pincode: Joi.string().allow("", null),
+      country: Joi.string().allow("", null),
+    }).optional(),
+  }).optional(),
+
+  bank_details: Joi.object({
+    bank_name: Joi.string().allow("", null),
+    account_holder: Joi.string().allow("", null),
+    account_number: Joi.string().allow("", null),
+    ifsc: Joi.string().allow("", null),
+    upi_id: Joi.string().allow("", null),
+    payment_mode: Joi.string().allow("", null),
+  }).optional(),
+
+  signature: Joi.object({
+    authorized_by: Joi.string().allow("", null),
+    designation: Joi.string().allow("", null),
+  }).optional(),
+
+  items: Joi.array().items(invoiceItemSchema).min(1).required(),
+});
+
+const updateInvoiceSchema = Joi.object({
+  invoice_no: Joi.string().trim().optional(),
+  client_id: Joi.number().integer().optional(),
+  status: Joi.string().valid("paid", "pending", "overdue", "draft").optional(),
+  currency: Joi.string().valid("INR", "USD", "EUR", "GBP").optional(),
+  subtotal: Joi.number().min(0).optional(),
+  discount_type: Joi.string().valid("pct", "flat").optional(),
+  discount_value: Joi.number().min(0).optional(),
+  shipping_charge: Joi.number().min(0).optional(),
+  gst_rate: Joi.number().min(0).max(100).optional(),
+  gst_amount: Joi.number().min(0).optional(),
+  tds_rate: Joi.number().min(0).max(100).optional(),
+  tds_amount: Joi.number().min(0).optional(),
+  total_amount: Joi.number().min(0).optional(),
+  amount_paid: Joi.number().min(0).optional(),
+  balance_due: Joi.number().min(0).optional(),
+  issue_date: Joi.date().iso().optional(),
+  due_date: Joi.date().iso().allow(null, "").optional(),
+  payment_terms: Joi.string().allow(null, "").optional(),
+  notes: Joi.string().allow(null, "").optional(),
+  terms: Joi.string().allow(null, "").optional(),
+  bank_details: Joi.object({
+    bank_name: Joi.string().allow("", null),
+    account_holder: Joi.string().allow("", null),
+    account_number: Joi.string().allow("", null),
+    ifsc: Joi.string().allow("", null),
+    upi_id: Joi.string().allow("", null),
+    payment_mode: Joi.string().allow("", null),
+  }).optional(),
+  signature: Joi.object({
+    authorized_by: Joi.string().allow("", null),
+    designation: Joi.string().allow("", null),
+  }).optional(),
+  items: Joi.array().items(invoiceItemSchema).min(1).optional(),
+})
+  .min(1)
+  .messages({
+    "object.min": "At least one field must be provided for update.",
+  });
+
+module.exports = {
+  createInvoiceSchema,
+  updateInvoiceSchema,
 };

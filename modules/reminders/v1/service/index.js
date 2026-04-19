@@ -1,59 +1,105 @@
 const db = require("../../../../config/db");
+const { sendReminderEmail } = require("../../../../utils/mailer");
 
-// 🔹 Get All Reminders
-module.exports.getReminders = async () => {
+module.exports.getAllReminders = async () => {
     try {
-        return await db("reminders as r")
-            .join("invoices as i", "r.invoice_id", "i.id")
-            .join("clients as c", "i.client_id", "c.id")
+        const reminders = await db("reminders")
+            .leftJoin("invoices", "reminders.invoice_id", "invoices.id")
+            .leftJoin("clients", "invoices.client_id", "clients.id")
             .select(
-                "r.*",
-                "i.invoice_no",
-                "i.total_amount",
-                "i.due_date",
-                "c.name as client_name",
-                "c.email as client_email"
+                "reminders.*",
+                "invoices.invoice_no",
+                "invoices.total_amount",
+                "invoices.due_date",
+                "clients.name as client_name",
+                "clients.email as client_email"
             )
-            .orderBy("r.reminder_date", "asc");
-    } catch (error) {
-        console.error("Service Error (getReminders):", error);
-        throw new Error("Failed to fetch reminders.");
+            .orderBy("reminders.created_at", "desc");
+        return reminders;
+    } catch (err) {
+        console.error("Service Error:", err);
+        throw new Error("Failed to fetch reminders");
     }
 };
 
-// 🔹 Create Reminder
-module.exports.createReminder = async (props = {}) => {
-    const { invoice_id, reminder_date } = props;
+module.exports.getReminderById = async (id) => {
     try {
-        const [id] = await db("reminders").insert({
-            invoice_id,
-            reminder_date,
-            status: "upcoming"
-        });
-        return await db("reminders").where({ id }).first();
-    } catch (error) {
-        console.error("Service Error (createReminder):", error);
-        throw error;
+        const reminder = await db("reminders")
+            .leftJoin("invoices", "reminders.invoice_id", "invoices.id")
+            .leftJoin("clients", "invoices.client_id", "clients.id")
+            .select(
+                "reminders.*",
+                "invoices.invoice_no",
+                "invoices.total_amount",
+                "invoices.due_date",
+                "clients.name as client_name",
+                "clients.email as client_email"
+            )
+            .where({ "reminders.id": id })
+            .first();
+        return reminder;
+    } catch (err) {
+        console.error("Service Error:", err);
+        throw new Error("Failed to fetch reminder");
     }
 };
 
-// 🔹 Trigger Reminder (Simulated)
+module.exports.createReminder = async (data) => {
+    try {
+        const [id] = await db("reminders").insert(data);
+        const newReminder = await this.getReminderById(id);
+        return { status: true, data: newReminder };
+    } catch (err) {
+        console.error("Service Error:", err);
+        return { status: false, message: "Internal server error" };
+    }
+};
+
+module.exports.updateReminder = async (id, data) => {
+    try {
+        const updated = await db("reminders").where({ id }).update(data);
+        if (!updated) {
+            return { status: false, message: "Reminder not found" };
+        }
+        const updatedReminder = await this.getReminderById(id);
+        return { status: true, data: updatedReminder };
+    } catch (err) {
+        console.error("Service Error:", err);
+        return { status: false, message: "Internal server error" };
+    }
+};
+
 module.exports.triggerReminder = async (id) => {
     try {
-        const reminder = await db("reminders").where({ id }).first();
-        if (!reminder) throw new Error("Reminder not found");
+        const reminder = await this.getReminderById(id);
+        if (!reminder) {
+            return { status: false, message: "Reminder not found" };
+        }
 
-        // Here you would integrate with NodeMailer
-        console.log(`Sending reminder for invoice ${reminder.invoice_id}...`);
+        if (reminder.type === "email") {
+            const emailSent = await sendReminderEmail(
+                reminder.client_email,
+                reminder.client_name,
+                reminder.invoice_no,
+                reminder.total_amount,
+                reminder.due_date
+            );
 
-        await db("reminders").where({ id }).update({
-            last_sent: db.fn.now(),
-            status: "sent"
-        });
-
-        return true;
-    } catch (error) {
-        console.error("Service Error (triggerReminder):", error);
-        throw error;
+            if (emailSent) {
+                await db("reminders").where({ id }).update({
+                    status: "sent",
+                    last_sent: new Date()
+                });
+                return { status: true, message: "Reminder sent successfully" };
+            } else {
+                await db("reminders").where({ id }).update({ status: "failed" });
+                return { status: false, message: "Failed to send email" };
+            }
+        } else {
+            return { status: false, message: "Only email reminders are currently supported." };
+        }
+    } catch (err) {
+        console.error("Service Error:", err);
+        return { status: false, message: "Internal server error" };
     }
 };
