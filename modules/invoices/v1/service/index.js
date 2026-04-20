@@ -29,8 +29,6 @@ module.exports.getAllInvoices = async () => {
         "invoices.payment_terms",
         "invoices.terms",
         "invoices.bank_details",
-
-
         "clients.name",
         "clients.email",
         "clients.phone",
@@ -41,6 +39,17 @@ module.exports.getAllInvoices = async () => {
   } catch (err) {
     console.error("Service Error:", err);
     throw new Error("Failed to fetch invoices");
+  }
+};
+
+// Helper: safely parse a JSON field that may already be an object or a string
+const parseJson = (val, fallback = {}) => {
+  if (!val) return fallback;
+  if (typeof val === "object") return val;
+  try {
+    return JSON.parse(val);
+  } catch (_) {
+    return fallback;
   }
 };
 
@@ -58,10 +67,18 @@ module.exports.getInvoiceById = async (id) => {
       )
       .where({ "invoices.id": id })
       .first();
+
     if (!invoice) return null;
 
     const items = await db("invoice_items").where({ invoice_id: id });
     invoice.items = items;
+
+    // Always return these as parsed objects so the frontend never needs JSON.parse
+    invoice.bank_details = parseJson(invoice.bank_details);
+    invoice.signature = parseJson(invoice.signature);
+    invoice.billing_address = parseJson(invoice.billing_address);
+    invoice.shipping_address = parseJson(invoice.shipping_address);
+
     return invoice;
   } catch (err) {
     console.error("Service Error:", err);
@@ -71,7 +88,6 @@ module.exports.getInvoiceById = async (id) => {
 
 module.exports.createInvoice = async (data) => {
   const trx = await db.transaction();
-
   try {
     const existing = await trx("invoices")
       .where({ invoice_no: data.invoice_no })
@@ -84,26 +100,42 @@ module.exports.createInvoice = async (data) => {
 
     const { items, client, bank_details, signature, ...invoiceData } = data;
 
-    // Handle JSON fields
+    // Persist JSON fields
     if (bank_details) invoiceData.bank_details = JSON.stringify(bank_details);
     if (signature) invoiceData.signature = JSON.stringify(signature);
+
+    // Persist client snapshot fields onto the invoice row
+    // so the edit page can always reload them correctly
+    if (client) {
+      invoiceData.client_gstin = client.gstin || null;
+      invoiceData.client_pan = client.pan || null;
+      invoiceData.client_website = client.website || null;
+      invoiceData.client_phone = client.phone || null;
+      invoiceData.place_of_supply = client.place_of_supply || null;
+
+      if (client.billing_address)
+        invoiceData.billing_address = JSON.stringify(client.billing_address);
+      if (client.shipping_address)
+        invoiceData.shipping_address = JSON.stringify(client.shipping_address);
+    }
 
     const [invoiceId] = await trx("invoices").insert(invoiceData);
 
     if (items && items.length > 0) {
-      const itemsToInsert = items.map((item) => ({
-        invoice_id: invoiceId,
-        description: item.description,
-        quantity: item.quantity,
-        unit_price: item.unit_price,
-        tax_rate: item.tax_rate || 0,
-        amount: item.amount,
-      }));
-      await trx("invoice_items").insert(itemsToInsert);
+      await trx("invoice_items").insert(
+        items.map((item) => ({
+          invoice_id: invoiceId,
+          description: item.description,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          tax_rate: item.tax_rate || 0,
+          amount: item.amount,
+        })),
+      );
     }
 
     await trx.commit();
-    const invoice = await this.getInvoiceById(invoiceId);
+    const invoice = await module.exports.getInvoiceById(invoiceId);
     return { status: true, data: invoice };
   } catch (err) {
     await trx.rollback();
@@ -117,36 +149,50 @@ module.exports.updateInvoice = async (id, data) => {
   try {
     const { items, client, bank_details, signature, ...invoiceData } = data;
 
-    // Handle JSON fields
     if (bank_details) invoiceData.bank_details = JSON.stringify(bank_details);
     if (signature) invoiceData.signature = JSON.stringify(signature);
 
-    const updated = await trx("invoices").where({ id }).update(invoiceData);
+    if (client) {
+      if (client.gstin !== undefined)
+        invoiceData.client_gstin = client.gstin || null;
+      if (client.pan !== undefined) invoiceData.client_pan = client.pan || null;
+      if (client.website !== undefined)
+        invoiceData.client_website = client.website || null;
+      if (client.phone !== undefined)
+        invoiceData.client_phone = client.phone || null;
+      if (client.place_of_supply !== undefined)
+        invoiceData.place_of_supply = client.place_of_supply || null;
 
+      if (client.billing_address)
+        invoiceData.billing_address = JSON.stringify(client.billing_address);
+      if (client.shipping_address)
+        invoiceData.shipping_address = JSON.stringify(client.shipping_address);
+    }
+
+    const updated = await trx("invoices").where({ id }).update(invoiceData);
     if (!updated) {
       await trx.rollback();
       return { status: false, message: "Invoice not found" };
     }
 
     if (items) {
-      // Sync items: Delete existing and re-insert new
       await trx("invoice_items").where({ invoice_id: id }).del();
-
       if (items.length > 0) {
-        const itemsToInsert = items.map((item) => ({
-          invoice_id: id,
-          description: item.description,
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-          tax_rate: item.tax_rate || 0,
-          amount: item.amount,
-        }));
-        await trx("invoice_items").insert(itemsToInsert);
+        await trx("invoice_items").insert(
+          items.map((item) => ({
+            invoice_id: id,
+            description: item.description,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            tax_rate: item.tax_rate || 0,
+            amount: item.amount,
+          })),
+        );
       }
     }
 
     await trx.commit();
-    const updatedInvoice = await this.getInvoiceById(id);
+    const updatedInvoice = await module.exports.getInvoiceById(id);
     return { status: true, data: updatedInvoice };
   } catch (err) {
     await trx.rollback();
@@ -158,9 +204,7 @@ module.exports.updateInvoice = async (id, data) => {
 module.exports.deleteInvoice = async (id) => {
   try {
     const deleted = await db("invoices").where({ id }).del();
-    if (!deleted) {
-      return { status: false, message: "Invoice not found" };
-    }
+    if (!deleted) return { status: false, message: "Invoice not found" };
     return { status: true, message: "Invoice deleted successfully" };
   } catch (err) {
     console.error("Service Error:", err);

@@ -18,13 +18,16 @@ const invoiceItemSchema = Joi.object({
 
 const createInvoiceSchema = Joi.object({
   invoice_no: Joi.string().trim().required(),
-  client_id: Joi.number().integer().required(),
+
+  // ✅ FIX: client_id is optional — user may type a new client without selecting from registry
+  client_id: Joi.number().integer().optional().allow(null),
 
   status: Joi.string()
     .valid("paid", "pending", "overdue", "draft")
     .default("pending"),
 
-  currency: Joi.string().valid("INR", "USD", "EUR", "GBP").default("INR"),
+  // Always INR — kept open string for DB column compatibility, no strict enum
+  currency: Joi.string().default("INR"),
 
   subtotal: Joi.number().min(0).required(),
   discount_type: Joi.string().valid("pct", "flat").default("pct"),
@@ -41,7 +44,9 @@ const createInvoiceSchema = Joi.object({
   total_amount: Joi.number().min(0).required(),
 
   amount_paid: Joi.number().min(0).default(0),
-  balance_due: Joi.number().min(0).required(),
+
+  // ✅ FIX: removed .min(0) — balance_due can be negative when overpaid
+  balance_due: Joi.number().required(),
 
   issue_date: Joi.date().iso().required(),
   due_date: Joi.date().iso().allow(null, ""),
@@ -54,7 +59,9 @@ const createInvoiceSchema = Joi.object({
   // ==================== OPTIONAL FIELDS ====================
   client: Joi.object({
     name: Joi.string().allow("", null),
-    email: Joi.string().email().allow("", null),
+    email: Joi.string()
+      .email({ tlds: { allow: false } })
+      .allow("", null),
     phone: Joi.string().allow("", null),
     website: Joi.string().allow("", null),
     gstin: Joi.string().allow("", null),
@@ -97,9 +104,9 @@ const createInvoiceSchema = Joi.object({
 
 const updateInvoiceSchema = Joi.object({
   invoice_no: Joi.string().trim().optional(),
-  client_id: Joi.number().integer().optional(),
+  client_id: Joi.number().integer().optional().allow(null),
   status: Joi.string().valid("paid", "pending", "overdue", "draft").optional(),
-  currency: Joi.string().valid("INR", "USD", "EUR", "GBP").optional(),
+  currency: Joi.string().optional(),
   subtotal: Joi.number().min(0).optional(),
   discount_type: Joi.string().valid("pct", "flat").optional(),
   discount_value: Joi.number().min(0).optional(),
@@ -110,12 +117,40 @@ const updateInvoiceSchema = Joi.object({
   tds_amount: Joi.number().min(0).optional(),
   total_amount: Joi.number().min(0).optional(),
   amount_paid: Joi.number().min(0).optional(),
-  balance_due: Joi.number().min(0).optional(),
+  // ✅ FIX: balance_due can be negative when overpaid
+  balance_due: Joi.number().optional(),
   issue_date: Joi.date().iso().optional(),
   due_date: Joi.date().iso().allow(null, "").optional(),
   payment_terms: Joi.string().allow(null, "").optional(),
   notes: Joi.string().allow(null, "").optional(),
   terms: Joi.string().allow(null, "").optional(),
+  client: Joi.object({
+    name: Joi.string().allow("", null),
+    email: Joi.string()
+      .email({ tlds: { allow: false } })
+      .allow("", null),
+    phone: Joi.string().allow("", null),
+    website: Joi.string().allow("", null),
+    gstin: Joi.string().allow("", null),
+    pan: Joi.string().allow("", null),
+    place_of_supply: Joi.string().allow("", null),
+    billing_address: Joi.object({
+      line1: Joi.string().allow("", null),
+      line2: Joi.string().allow("", null),
+      city: Joi.string().allow("", null),
+      state: Joi.string().allow("", null),
+      pincode: Joi.string().allow("", null),
+      country: Joi.string().allow("", null),
+    }).optional(),
+    shipping_address: Joi.object({
+      line1: Joi.string().allow("", null),
+      line2: Joi.string().allow("", null),
+      city: Joi.string().allow("", null),
+      state: Joi.string().allow("", null),
+      pincode: Joi.string().allow("", null),
+      country: Joi.string().allow("", null),
+    }).optional(),
+  }).optional(),
   bank_details: Joi.object({
     bank_name: Joi.string().allow("", null),
     account_holder: Joi.string().allow("", null),
