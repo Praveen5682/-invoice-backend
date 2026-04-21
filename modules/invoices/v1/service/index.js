@@ -29,13 +29,40 @@ module.exports.getAllInvoices = async () => {
         "invoices.payment_terms",
         "invoices.terms",
         "invoices.bank_details",
-        "clients.name",
-        "clients.email",
-        "clients.phone",
-        "clients.address",
+        "invoices.billing_address",
+        "invoices.client_phone",
+
+        // ✅ Fallback: use client table if joined, else use invoice's own snapshot columns
+        db.raw(
+          "COALESCE(clients.name,  invoices.billing_address->>'$.line1', 'Unknown') as name",
+        ),
+        db.raw("COALESCE(clients.email, NULL) as email"),
+        db.raw("COALESCE(clients.phone, invoices.client_phone) as phone"),
+        db.raw("COALESCE(clients.address, NULL) as address"),
       )
       .orderBy("invoices.created_at", "desc");
-    return invoices;
+
+    // Parse billing_address to extract name/email for manual-entry invoices
+    return invoices.map((inv) => {
+      if (!inv.client_id) {
+        const billing =
+          typeof inv.billing_address === "string"
+            ? JSON.parse(inv.billing_address || "{}")
+            : inv.billing_address || {};
+
+        return {
+          ...inv,
+          // Use stored client_phone as phone fallback
+          phone: inv.phone || inv.client_phone || null,
+          // Build a readable "address" string from billing_address for display
+          address:
+            [billing.line1, billing.city, billing.state]
+              .filter(Boolean)
+              .join(", ") || null,
+        };
+      }
+      return inv;
+    });
   } catch (err) {
     console.error("Service Error:", err);
     throw new Error("Failed to fetch invoices");
@@ -100,12 +127,12 @@ module.exports.createInvoice = async (data) => {
 
     const { items, client, bank_details, signature, ...invoiceData } = data;
 
-    // Persist JSON fields
+    // ✅ Explicitly set client_id to null if not provided
+    invoiceData.client_id = data.client_id || null;
+
     if (bank_details) invoiceData.bank_details = JSON.stringify(bank_details);
     if (signature) invoiceData.signature = JSON.stringify(signature);
 
-    // Persist client snapshot fields onto the invoice row
-    // so the edit page can always reload them correctly
     if (client) {
       invoiceData.client_gstin = client.gstin || null;
       invoiceData.client_pan = client.pan || null;
@@ -206,6 +233,17 @@ module.exports.deleteInvoice = async (id) => {
     const deleted = await db("invoices").where({ id }).del();
     if (!deleted) return { status: false, message: "Invoice not found" };
     return { status: true, message: "Invoice deleted successfully" };
+  } catch (err) {
+    console.error("Service Error:", err);
+    return { status: false, message: "Internal server error" };
+  }
+};
+
+module.exports.updateInvoiceStatus = async (id, status) => {
+  try {
+    const updated = await db("invoices").where({ id }).update({ status });
+    if (!updated) return { status: false, message: "Invoice not found" };
+    return { status: true, message: "Status updated successfully" };
   } catch (err) {
     console.error("Service Error:", err);
     return { status: false, message: "Internal server error" };

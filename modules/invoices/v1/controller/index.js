@@ -116,3 +116,30 @@ module.exports.deleteInvoice = async (req, res) => {
       .json({ success: false, message: "Failed to delete invoice." });
   }
 };
+
+module.exports.updateInvoiceStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    const allowed = ["paid", "pending", "overdue", "draft"];
+
+    if (!status || !allowed.includes(status)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid status value" });
+    }
+
+    const response = await service.updateInvoiceStatus(req.params.id, status);
+    if (!response.status) {
+      return res
+        .status(404)
+        .json({ success: false, message: response.message });
+    }
+
+    return res.status(200).json({ success: true, message: response.message });
+  } catch (err) {
+    console.error("Update Status Error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to update status" });
+  }
+};

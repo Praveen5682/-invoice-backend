@@ -9,5 +9,6 @@ router.get("/:id", authCheck, Controller.getInvoiceById);
 router.post("/", authCheck, Controller.createInvoice);
 router.put("/:id", authCheck, Controller.updateInvoice);
 router.delete("/:id", authCheck, Controller.deleteInvoice);
+router.patch("/:id/status", authCheck, Controller.updateInvoiceStatus);
 
 module.exports = router;
