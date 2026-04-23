@@ -7,7 +7,8 @@ const authCheck = require("../../../../middleware/authCheck");
 router.get("/get-all-clients", authCheck, Controller.getAllClients);
 router.get("/:id", authCheck, Controller.getClientById);
 router.post("/create-client", authCheck, Controller.createClient);
-router.put("/:clientId", authCheck, Controller.updateClient);
-router.delete("/:clientId", authCheck, Controller.deleteClient);
+router.put("/:id", authCheck, Controller.updateClient);
+router.delete("/:id", authCheck, Controller.deleteClient);
+router.patch("/:id/status", Controller.updateClientStatus);
 
 module.exports = router;

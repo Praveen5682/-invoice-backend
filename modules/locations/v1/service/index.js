@@ -5,7 +5,7 @@ module.exports.getStates = async () => {
   try {
     const states = await db("states")
       .select("id", "name")
-      .where({ country_id: 1 }) // India (assuming 1 = India)
+      .where({ country_id: 101 }) // India (assuming 1 = India)
       .orderBy("name", "asc");
 
     return states;

@@ -35,10 +35,15 @@ module.exports.getClientById = async (id) => {
       email: rows[0].email,
       phone: rows[0].phone,
       address: rows[0].address,
+      contact_person: rows[0].contact_person, // ✅
+      gstin: rows[0].gstin, // ✅
+      city: rows[0].city, // ✅
+      state: rows[0].state, // ✅
+      zip: rows[0].zip, // ✅
+      payment_terms: rows[0].payment_terms, // ✅
       created_at: rows[0].created_at,
       invoices: [],
     };
-
     // Attach invoices
     rows.forEach((row) => {
       if (row.invoice_id) {
@@ -62,14 +67,31 @@ module.exports.getClientById = async (id) => {
 module.exports.createClient = async (data) => {
   try {
     const existing = await db("clients").where({ email: data.email }).first();
+
     if (existing) {
       return {
         status: false,
         message: "Client with this email already exists.",
       };
     }
-    const [id] = await db("clients").insert(data);
+
+    const payload = {
+      name: data.name,
+      contact_person: data.contactPerson,
+      email: data.email,
+      phone: data.phone,
+      gstin: data.gstin,
+      address: data.address,
+      city: data.city,
+      state: data.state,
+      zip: data.zip,
+      payment_terms: data.paymentTerms,
+    };
+
+    const [id] = await db("clients").insert(payload);
+
     const newClient = await db("clients").where({ id }).first();
+
     return { status: true, data: newClient };
   } catch (err) {
     console.error("Service Error:", err);
@@ -79,27 +101,36 @@ module.exports.createClient = async (data) => {
 
 module.exports.updateClient = async (id, data) => {
   try {
-    if (data.email) {
-      const existing = await db("clients")
-        .where({ email: data.email })
-        .whereNot({ id })
-        .first();
-      if (existing) {
-        return {
-          status: false,
-          message: "Another client with this email already exists.",
-        };
-      }
+    if (!id) throw new Error("Client ID is missing");
+
+    // Check duplicate email
+    const existing = await db("clients")
+      .where("email", data.email)
+      .andWhereNot("id", id)
+      .first();
+
+    if (existing) {
+      throw new Error("Email already exists");
     }
-    const updated = await db("clients").where({ id }).update(data);
-    if (!updated) {
-      return { status: false, message: "Client not found." };
-    }
-    const updatedClient = await db("clients").where({ id }).first();
-    return { status: true, data: updatedClient };
+
+    await db("clients").where("id", id).update({
+      name: data.name,
+      contact_person: data.contactPerson, // ✅ FIX
+      email: data.email,
+      phone: data.phone,
+      gstin: data.gstin,
+      address: data.address,
+      city: data.city,
+      state: data.state,
+      zip: data.zip,
+      payment_terms: data.paymentTerms, // ✅ FIX
+      updated_at: db.fn.now(),
+    });
+
+    return true;
   } catch (err) {
     console.error("Service Error:", err);
-    return { status: false, message: "Internal server error" };
+    throw err;
   }
 };
 
@@ -110,6 +141,21 @@ module.exports.deleteClient = async (id) => {
       return { status: false, message: "Client not found." };
     }
     return { status: true, message: "Client deleted successfully." };
+  } catch (err) {
+    console.error("Service Error:", err);
+    return { status: false, message: "Internal server error" };
+  }
+};
+
+module.exports.toggleClientStatus = async (id, status) => {
+  try {
+    const updated = await db("clients").where({ id }).update({ status });
+
+    if (!updated) {
+      return { status: false, message: "Client not found" };
+    }
+
+    return { status: true, message: "Status updated successfully" };
   } catch (err) {
     console.error("Service Error:", err);
     return { status: false, message: "Internal server error" };

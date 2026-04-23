@@ -63,34 +63,25 @@ module.exports.createClient = async (req, res) => {
 };
 
 module.exports.updateClient = async (req, res) => {
+  console.log("😂", req.body);
   try {
-    const { error, value } = updateClientSchema.validate(req.body);
-    if (error) {
-      return res
-        .status(400)
-        .json({ success: false, message: error.details[0].message });
-    }
+    const id = req.params.id; // ✅ THIS IS IMPORTANT
 
-    const response = await service.updateClient(req.params.id, value);
-    if (!response.status) {
-      return res
-        .status(400)
-        .json({ success: false, message: response.message });
-    }
+    const updated = await service.updateClient(id, req.body);
 
     return res.status(200).json({
       success: true,
-      message: "Client updated successfully.",
-      data: response.data,
+      message: "Client updated successfully",
+      data: updated,
     });
   } catch (err) {
-    console.error("Client Controller Error:", err);
-    return res
-      .status(500)
-      .json({ success: false, message: "Failed to update client." });
+    console.error("Controller Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: err.message || "Update failed",
+    });
   }
 };
-
 module.exports.deleteClient = async (req, res) => {
   try {
     const response = await service.deleteClient(req.params.id);
@@ -107,5 +98,37 @@ module.exports.deleteClient = async (req, res) => {
     return res
       .status(500)
       .json({ success: false, message: "Failed to delete client." });
+  }
+};
+
+module.exports.updateClientStatus = async (req, res) => {
+  console.log("BODY:", req.body);
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (![0, 1].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid status value",
+      });
+    }
+
+    const result = await service.toggleClientStatus(id, status);
+
+    if (!result.status) {
+      return res.status(400).json(result);
+    }
+
+    return res.json({
+      success: true,
+      message: result.message,
+    });
+  } catch (err) {
+    console.error("Controller Error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Something went wrong",
+    });
   }
 };
