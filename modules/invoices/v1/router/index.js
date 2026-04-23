@@ -4,7 +4,7 @@ const Controller = require("../controller/index");
 const authCheck = require("../../../../middleware/authCheck");
 
 // Protected Invoice Routes
-router.get("/", authCheck, Controller.getAllInvoices);
+router.get("/get-invoices", authCheck, Controller.getAllInvoices);
 router.get("/:id", authCheck, Controller.getInvoiceById);
 router.post("/", authCheck, Controller.createInvoice);
 router.put("/:id", authCheck, Controller.updateInvoice);

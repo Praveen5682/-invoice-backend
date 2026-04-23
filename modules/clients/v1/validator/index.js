@@ -20,9 +20,11 @@ const updateClientSchema = Joi.object({
   email: Joi.string().trim().email().optional(),
   phone: Joi.string().trim().allow("").optional(),
   address: Joi.string().trim().allow("").optional(),
-}).min(1).messages({
-  "object.min": "At least one field must be provided for update."
-});
+})
+  .min(1)
+  .messages({
+    "object.min": "At least one field must be provided for update.",
+  });
 
 module.exports = {
   createClientSchema,

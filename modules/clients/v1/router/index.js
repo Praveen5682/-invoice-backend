@@ -4,10 +4,10 @@ const Controller = require("../controller/index");
 const authCheck = require("../../../../middleware/authCheck");
 
 // Protected Client Routes
-router.get("/", authCheck, Controller.getAllClients);
+router.get("/get-all-clients", authCheck, Controller.getAllClients);
 router.get("/:id", authCheck, Controller.getClientById);
-router.post("/", authCheck, Controller.createClient);
-router.put("/:id", authCheck, Controller.updateClient);
-router.delete("/:id", authCheck, Controller.deleteClient);
+router.post("/create-client", authCheck, Controller.createClient);
+router.put("/:clientId", authCheck, Controller.updateClient);
+router.delete("/:clientId", authCheck, Controller.deleteClient);
 
 module.exports = router;
