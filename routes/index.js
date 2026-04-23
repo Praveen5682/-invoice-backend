@@ -11,6 +11,7 @@ const dashboardRoutes = require("../modules/dashboard/v1/router/index");
 const paymentRoutes = require("../modules/payments/v1/router/index");
 const subscriptionRoutes = require("../modules/subscriptions/v1/router/index");
 const locationRoutes = require("../modules/locations/v1/router/index");
+const productRoutes = require("../modules/products/v1/router/index");
 
 router.use("/clients", clientRoutes);
 router.use("/invoices", invoiceRoutes);
@@ -20,5 +21,6 @@ router.use("/dashboard", dashboardRoutes);
 router.use("/payments", paymentRoutes);
 router.use("/subscriptions", subscriptionRoutes);
 router.use("/locations", locationRoutes);
+router.use("/products", productRoutes);
 
 module.exports = router;
