@@ -93,3 +93,46 @@ module.exports.getMonthlyReports = async () => {
     return [];
   }
 };
+
+module.exports.getQuarterlyReports = async () => {
+  try {
+    const currentYear = new Date().getFullYear();
+
+    const data = await db("invoices")
+      .select(
+        db.raw("CONCAT('Q', QUARTER(issue_date), ' ', YEAR(issue_date)) as period"),
+        db.raw("COUNT(id) as invoice_count"),
+        db.raw("SUM(total_amount) as total_amount"),
+        db.raw("SUM(CASE WHEN status = 'paid' THEN total_amount ELSE 0 END) as paid_amount"),
+        db.raw("SUM(CASE WHEN status IN ('pending', 'overdue') THEN total_amount ELSE 0 END) as pending_amount")
+      )
+      .whereRaw(`YEAR(issue_date) = ?`, [currentYear])
+      .groupByRaw("QUARTER(issue_date), YEAR(issue_date)")
+      .orderByRaw("YEAR(issue_date) DESC, QUARTER(issue_date) DESC");
+
+    return data;
+  } catch (err) {
+    console.error("Dashboard Service Error (getQuarterlyReports):", err);
+    return [];
+  }
+};
+
+module.exports.getYearlyReports = async () => {
+  try {
+    const data = await db("invoices")
+      .select(
+        db.raw("YEAR(issue_date) as period"),
+        db.raw("COUNT(id) as invoice_count"),
+        db.raw("SUM(total_amount) as total_amount"),
+        db.raw("SUM(CASE WHEN status = 'paid' THEN total_amount ELSE 0 END) as paid_amount"),
+        db.raw("SUM(CASE WHEN status IN ('pending', 'overdue') THEN total_amount ELSE 0 END) as pending_amount")
+      )
+      .groupByRaw("YEAR(issue_date)")
+      .orderByRaw("YEAR(issue_date) DESC");
+
+    return data;
+  } catch (err) {
+    console.error("Dashboard Service Error (getYearlyReports):", err);
+    return [];
+  }
+};

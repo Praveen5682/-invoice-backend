@@ -25,7 +25,17 @@ module.exports.getOverview = async (req, res) => {
 
 module.exports.getReports = async (req, res) => {
   try {
-    const data = await service.getMonthlyReports();
+    const { type } = req.query;
+    let data;
+
+    if (type === "Quarterly") {
+      data = await service.getQuarterlyReports();
+    } else if (type === "Yearly") {
+      data = await service.getYearlyReports();
+    } else {
+      data = await service.getMonthlyReports();
+    }
+
     return res.status(200).json({
       success: true,
       data,

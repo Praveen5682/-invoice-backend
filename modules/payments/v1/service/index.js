@@ -46,7 +46,7 @@ module.exports.createPayment = async (data) => {
         // For example if payment captures full amount, mark invoice as Paid
         
         await trx.commit();
-        const newPayment = await this.getPaymentById(id);
+        const newPayment = await module.exports.getPaymentById(id);
         return { status: true, data: newPayment };
     } catch (err) {
         await trx.rollback();
@@ -61,7 +61,7 @@ module.exports.updatePayment = async (id, data) => {
         if (!updated) {
             return { status: false, message: "Payment not found" };
         }
-        const updatedPayment = await this.getPaymentById(id);
+        const updatedPayment = await module.exports.getPaymentById(id);
         return { status: true, data: updatedPayment };
     } catch (err) {
         console.error("Service Error:", err);

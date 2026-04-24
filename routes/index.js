@@ -12,6 +12,7 @@ const paymentRoutes = require("../modules/payments/v1/router/index");
 const subscriptionRoutes = require("../modules/subscriptions/v1/router/index");
 const locationRoutes = require("../modules/locations/v1/router/index");
 const productRoutes = require("../modules/products/v1/router/index");
+const settingsRoutes = require("../modules/settings/v1/router/index");
 
 router.use("/clients", clientRoutes);
 router.use("/invoices", invoiceRoutes);
@@ -22,5 +23,6 @@ router.use("/payments", paymentRoutes);
 router.use("/subscriptions", subscriptionRoutes);
 router.use("/locations", locationRoutes);
 router.use("/products", productRoutes);
+router.use("/settings", settingsRoutes);
 
 module.exports = router;

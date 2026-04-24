@@ -38,7 +38,7 @@ module.exports.getSubscriptionById = async (id) => {
 module.exports.createSubscription = async (data) => {
     try {
         const [id] = await db("subscriptions").insert(data);
-        const newSubscription = await this.getSubscriptionById(id);
+        const newSubscription = await module.exports.getSubscriptionById(id);
         return { status: true, data: newSubscription };
     } catch (err) {
         console.error("Service Error:", err);
@@ -52,7 +52,7 @@ module.exports.updateSubscription = async (id, data) => {
         if (!updated) {
             return { status: false, message: "Subscription not found" };
         }
-        const updatedSubscription = await this.getSubscriptionById(id);
+        const updatedSubscription = await module.exports.getSubscriptionById(id);
         return { status: true, data: updatedSubscription };
     } catch (err) {
         console.error("Service Error:", err);
