@@ -112,13 +112,13 @@ module.exports.processReminders = async () => {
   try {
     const today = new Date().toISOString().split("T")[0];
 
-    // Update overdue reminders
+    // Update overdue
     await db("reminders")
-      .where("status", "upcoming")
+      .where("status", "pending") // ← consistent with your schema
       .where("reminder_date", "<", today)
       .update({ status: "overdue" });
 
-    // Get reminders that should be sent today
+    // Get reminders to send today
     const remindersToSend = await db("reminders")
       .leftJoin("invoices", "reminders.invoice_id", "invoices.id")
       .leftJoin("clients", "invoices.client_id", "clients.id")
@@ -130,7 +130,7 @@ module.exports.processReminders = async () => {
         "clients.name as client_name",
         "clients.email as client_email",
       )
-      .where("reminders.status", "upcoming")
+      .where("reminders.status", "pending")
       .where("reminders.reminder_date", "<=", today);
 
     const results = [];
@@ -160,7 +160,11 @@ module.exports.processReminders = async () => {
       }
     }
 
-    return { success: true, processed: results.length };
+    return {
+      success: true,
+      processed: results.length,
+      details: results,
+    };
   } catch (err) {
     console.error("Process Reminders Error:", err);
     throw err;

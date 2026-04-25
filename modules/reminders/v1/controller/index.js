@@ -94,7 +94,7 @@ module.exports.updateReminder = async (req, res) => {
 module.exports.triggerReminder = async (req, res) => {
   try {
     const response = await service.triggerReminder(req.params.id);
-    s;
+
     if (!response.status) {
       return res
         .status(400)
@@ -110,7 +110,6 @@ module.exports.triggerReminder = async (req, res) => {
   }
 };
 
-// controller
 module.exports.processReminders = async (req, res) => {
   try {
     const result = await service.processReminders();
@@ -120,6 +119,7 @@ module.exports.processReminders = async (req, res) => {
       data: result,
     });
   } catch (err) {
+    console.error("Process Reminders Controller Error:", err);
     return res
       .status(500)
       .json({ success: false, message: "Failed to process reminders" });

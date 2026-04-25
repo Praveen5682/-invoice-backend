@@ -8,8 +8,9 @@ const cron = require("node-cron");
 const reminderService = require("./modules/reminders/v1/service/index");
 
 // Run every day at 8:00 AM
-cron.schedule("0 8 * * *", async () => {
-  console.log("Running daily reminder job...");
+cron.schedule("0 * * * * *", async () => {
+  // ← Fixed: added extra 0 for seconds
+  console.log("Running daily reminder job at 8:00 AM...");
   try {
     const result = await reminderService.processReminders();
     console.log(
