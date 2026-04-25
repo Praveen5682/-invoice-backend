@@ -49,13 +49,11 @@ module.exports.createReminder = async (req, res) => {
         .json({ success: false, message: response.message });
     }
 
-    return res
-      .status(201)
-      .json({
-        success: true,
-        message: "Reminder created successfully.",
-        data: response.data,
-      });
+    return res.status(201).json({
+      success: true,
+      message: "Reminder created successfully.",
+      data: response.data,
+    });
   } catch (err) {
     console.error("Reminder Controller Error:", err);
     return res
@@ -80,13 +78,11 @@ module.exports.updateReminder = async (req, res) => {
         .json({ success: false, message: response.message });
     }
 
-    return res
-      .status(200)
-      .json({
-        success: true,
-        message: "Reminder updated successfully.",
-        data: response.data,
-      });
+    return res.status(200).json({
+      success: true,
+      message: "Reminder updated successfully.",
+      data: response.data,
+    });
   } catch (err) {
     console.error("Reminder Controller Error:", err);
     return res
@@ -98,6 +94,7 @@ module.exports.updateReminder = async (req, res) => {
 module.exports.triggerReminder = async (req, res) => {
   try {
     const response = await service.triggerReminder(req.params.id);
+    s;
     if (!response.status) {
       return res
         .status(400)
@@ -110,5 +107,21 @@ module.exports.triggerReminder = async (req, res) => {
     return res
       .status(500)
       .json({ success: false, message: "Failed to trigger reminder." });
+  }
+};
+
+// controller
+module.exports.processReminders = async (req, res) => {
+  try {
+    const result = await service.processReminders();
+    return res.status(200).json({
+      success: true,
+      message: `Processed ${result.processed} reminders`,
+      data: result,
+    });
+  } catch (err) {
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to process reminders" });
   }
 };

@@ -8,22 +8,29 @@ const createPaymentSchema = Joi.object({
     "number.min": "Amount must be greater than 0.",
     "any.required": "Amount is required.",
   }),
-  method: Joi.string().valid('UPI', 'CARD', 'CASH', 'TRANSFER').required().messages({
-    "any.required": "Payment method is required.",
-  }),
+  method: Joi.string()
+    .valid("UPI", "CARD", "CASH", "TRANSFER")
+    .required()
+    .messages({
+      "any.required": "Payment method is required.",
+    }),
   transaction_id: Joi.string().trim().optional(),
-  status: Joi.string().valid('captured', 'refunded', 'failed').default('captured'),
+  status: Joi.string()
+    .valid("captured", "refunded", "failed")
+    .default("captured"),
   payment_date: Joi.date().iso().required().messages({
     "any.required": "Payment date is required.",
   }),
 });
 
 const updatePaymentSchema = Joi.object({
-  status: Joi.string().valid('captured', 'refunded', 'failed').optional(),
+  status: Joi.string().valid("captured", "refunded", "failed").optional(),
   transaction_id: Joi.string().trim().optional(),
-}).min(1).messages({
-  "object.min": "At least one field must be provided for update."
-});
+})
+  .min(1)
+  .messages({
+    "object.min": "At least one field must be provided for update.",
+  });
 
 module.exports = {
   createPaymentSchema,

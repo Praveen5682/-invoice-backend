@@ -106,3 +106,63 @@ module.exports.triggerReminder = async (id) => {
     return { status: false, message: "Internal server error" };
   }
 };
+
+// In service/index.js  (or reminders service)
+module.exports.processReminders = async () => {
+  try {
+    const today = new Date().toISOString().split("T")[0];
+
+    // Update overdue reminders
+    await db("reminders")
+      .where("status", "upcoming")
+      .where("reminder_date", "<", today)
+      .update({ status: "overdue" });
+
+    // Get reminders that should be sent today
+    const remindersToSend = await db("reminders")
+      .leftJoin("invoices", "reminders.invoice_id", "invoices.id")
+      .leftJoin("clients", "invoices.client_id", "clients.id")
+      .select(
+        "reminders.*",
+        "invoices.invoice_no",
+        "invoices.total_amount",
+        "invoices.due_date",
+        "clients.name as client_name",
+        "clients.email as client_email",
+      )
+      .where("reminders.status", "upcoming")
+      .where("reminders.reminder_date", "<=", today);
+
+    const results = [];
+
+    for (const reminder of remindersToSend) {
+      if (reminder.type === "email" && reminder.client_email) {
+        const emailSent = await sendReminderEmail(
+          reminder.client_email,
+          reminder.client_name,
+          reminder.invoice_no,
+          reminder.total_amount,
+          reminder.due_date,
+        );
+
+        if (emailSent) {
+          await db("reminders").where({ id: reminder.id }).update({
+            status: "sent",
+            last_sent: new Date(),
+          });
+          results.push({ id: reminder.id, status: "sent" });
+        } else {
+          await db("reminders")
+            .where({ id: reminder.id })
+            .update({ status: "failed" });
+          results.push({ id: reminder.id, status: "failed" });
+        }
+      }
+    }
+
+    return { success: true, processed: results.length };
+  } catch (err) {
+    console.error("Process Reminders Error:", err);
+    throw err;
+  }
+};
