@@ -1,18 +1,26 @@
 const db = require("../../../../config/db");
 
-module.exports.getStats = async () => {
+module.exports.getStats = async (userId) => {
   try {
     const [totalRevenueResult] = await db("invoices")
       .sum("total_amount as sum")
-      .where({ status: "paid" });
+      .where({ status: "paid", user_id: userId });
+
     const [pendingAmountResult] = await db("invoices")
       .sum("total_amount as sum")
-      .where({ status: "pending" });
+      .where({ status: "pending", user_id: userId });
+
     const [overdueAmountResult] = await db("invoices")
       .sum("total_amount as sum")
-      .where({ status: "overdue" });
-    const [invoicesCountResult] = await db("invoices").count("id as count");
-    const [activeClientsResult] = await db("clients").count("id as count");
+      .where({ status: "overdue", user_id: userId });
+
+    const [invoicesCountResult] = await db("invoices")
+      .count("id as count")
+      .where({ user_id: userId });
+
+    const [activeClientsResult] = await db("clients")
+      .count("id as count")
+      .where({ user_id: userId });
 
     return {
       total_invoices: invoicesCountResult?.count || 0,
@@ -27,9 +35,10 @@ module.exports.getStats = async () => {
   }
 };
 
-module.exports.getChartData = async () => {
+module.exports.getChartData = async (userId) => {
   try {
     const data = await db("invoices")
+      .where({ user_id: userId })
       .select(
         db.raw("DATE_FORMAT(issue_date, '%M') as month"),
         db.raw("SUM(total_amount) as amount"),
@@ -45,10 +54,11 @@ module.exports.getChartData = async () => {
   }
 };
 
-module.exports.getOverdueReminders = async () => {
+module.exports.getOverdueReminders = async (userId) => {
   try {
     const reminders = await db("invoices")
       .leftJoin("clients", "invoices.client_id", "clients.id")
+      .where({ "invoices.status": "overdue", "invoices.user_id": userId })
       .select(
         "invoices.id",
         "clients.name as client_name",
@@ -56,7 +66,6 @@ module.exports.getOverdueReminders = async () => {
         "invoices.due_date as reminder_date",
         "invoices.id as invoice_id",
       )
-      .where({ "invoices.status": "overdue" })
       .orderBy("invoices.due_date", "asc")
       .limit(5);
 
@@ -67,23 +76,24 @@ module.exports.getOverdueReminders = async () => {
   }
 };
 
-module.exports.getMonthlyReports = async () => {
+module.exports.getMonthlyReports = async (userId) => {
   try {
     const currentYear = new Date().getFullYear();
 
     const data = await db("invoices")
+      .where({ user_id: userId })
       .select(
-        db.raw("DATE_FORMAT(issue_date, '%M %Y') as period"), // was: month → period
-        db.raw("COUNT(id) as invoice_count"), // was: missing entirely
-        db.raw("SUM(total_amount) as total_amount"), // was: invoiceGenerated
+        db.raw("DATE_FORMAT(issue_date, '%M %Y') as period"),
+        db.raw("COUNT(id) as invoice_count"),
+        db.raw("SUM(total_amount) as total_amount"),
         db.raw(
-          "SUM(CASE WHEN status = 'paid' THEN total_amount ELSE 0 END) as paid_amount", // was: revenueCollected
+          "SUM(CASE WHEN status = 'paid' THEN total_amount ELSE 0 END) as paid_amount",
         ),
         db.raw(
-          "SUM(CASE WHEN status IN ('pending', 'overdue') THEN total_amount ELSE 0 END) as pending_amount", // was: pendingDues (now includes overdue)
+          "SUM(CASE WHEN status IN ('pending', 'overdue') THEN total_amount ELSE 0 END) as pending_amount",
         ),
       )
-      .whereRaw(`YEAR(issue_date) = ?`, [currentYear])
+      .whereRaw("YEAR(issue_date) = ?", [currentYear])
       .groupByRaw("DATE_FORMAT(issue_date, '%M %Y')")
       .orderByRaw("MIN(issue_date) DESC");
 
@@ -94,19 +104,26 @@ module.exports.getMonthlyReports = async () => {
   }
 };
 
-module.exports.getQuarterlyReports = async () => {
+module.exports.getQuarterlyReports = async (userId) => {
   try {
     const currentYear = new Date().getFullYear();
 
     const data = await db("invoices")
+      .where({ user_id: userId })
       .select(
-        db.raw("CONCAT('Q', QUARTER(issue_date), ' ', YEAR(issue_date)) as period"),
+        db.raw(
+          "CONCAT('Q', QUARTER(issue_date), ' ', YEAR(issue_date)) as period",
+        ),
         db.raw("COUNT(id) as invoice_count"),
         db.raw("SUM(total_amount) as total_amount"),
-        db.raw("SUM(CASE WHEN status = 'paid' THEN total_amount ELSE 0 END) as paid_amount"),
-        db.raw("SUM(CASE WHEN status IN ('pending', 'overdue') THEN total_amount ELSE 0 END) as pending_amount")
+        db.raw(
+          "SUM(CASE WHEN status = 'paid' THEN total_amount ELSE 0 END) as paid_amount",
+        ),
+        db.raw(
+          "SUM(CASE WHEN status IN ('pending', 'overdue') THEN total_amount ELSE 0 END) as pending_amount",
+        ),
       )
-      .whereRaw(`YEAR(issue_date) = ?`, [currentYear])
+      .whereRaw("YEAR(issue_date) = ?", [currentYear])
       .groupByRaw("QUARTER(issue_date), YEAR(issue_date)")
       .orderByRaw("YEAR(issue_date) DESC, QUARTER(issue_date) DESC");
 
@@ -117,15 +134,20 @@ module.exports.getQuarterlyReports = async () => {
   }
 };
 
-module.exports.getYearlyReports = async () => {
+module.exports.getYearlyReports = async (userId) => {
   try {
     const data = await db("invoices")
+      .where({ user_id: userId })
       .select(
         db.raw("YEAR(issue_date) as period"),
         db.raw("COUNT(id) as invoice_count"),
         db.raw("SUM(total_amount) as total_amount"),
-        db.raw("SUM(CASE WHEN status = 'paid' THEN total_amount ELSE 0 END) as paid_amount"),
-        db.raw("SUM(CASE WHEN status IN ('pending', 'overdue') THEN total_amount ELSE 0 END) as pending_amount")
+        db.raw(
+          "SUM(CASE WHEN status = 'paid' THEN total_amount ELSE 0 END) as paid_amount",
+        ),
+        db.raw(
+          "SUM(CASE WHEN status IN ('pending', 'overdue') THEN total_amount ELSE 0 END) as pending_amount",
+        ),
       )
       .groupByRaw("YEAR(issue_date)")
       .orderByRaw("YEAR(issue_date) DESC");

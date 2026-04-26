@@ -6,7 +6,7 @@ const {
 
 module.exports.getAllInvoices = async (req, res) => {
   try {
-    const invoices = await service.getAllInvoices();
+    const invoices = await service.getAllInvoices(req.user.id);
     return res.status(200).json({ success: true, data: invoices });
   } catch (err) {
     console.error("Invoice Controller Error:", err);
@@ -18,7 +18,7 @@ module.exports.getAllInvoices = async (req, res) => {
 
 module.exports.getInvoiceById = async (req, res) => {
   try {
-    const invoice = await service.getInvoiceById(req.params.id);
+    const invoice = await service.getInvoiceById(req.params.id, req.user.id);
     if (!invoice) {
       return res
         .status(404)
@@ -46,7 +46,7 @@ module.exports.createInvoice = async (req, res) => {
       });
     }
 
-    const result = await service.createInvoice(value);
+    const result = await service.createInvoice(value, req.user.id);
 
     if (!result.status) {
       return res.status(400).json({
@@ -78,7 +78,7 @@ module.exports.updateInvoice = async (req, res) => {
         .json({ success: false, message: error.details[0].message });
     }
 
-    const response = await service.updateInvoice(req.params.id, value);
+    const response = await service.updateInvoice(req.params.id, value, req.user.id);
     if (!response.status) {
       return res
         .status(400)
@@ -100,7 +100,7 @@ module.exports.updateInvoice = async (req, res) => {
 
 module.exports.deleteInvoice = async (req, res) => {
   try {
-    const response = await service.deleteInvoice(req.params.id);
+    const response = await service.deleteInvoice(req.params.id, req.user.id);
     if (!response.status) {
       return res
         .status(400)
@@ -128,7 +128,11 @@ module.exports.updateInvoiceStatus = async (req, res) => {
         .json({ success: false, message: "Invalid status value" });
     }
 
-    const response = await service.updateInvoiceStatus(req.params.id, status);
+    const response = await service.updateInvoiceStatus(
+      req.params.id,
+      status,
+      req.user.id,
+    );
     if (!response.status) {
       return res
         .status(404)

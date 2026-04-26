@@ -1,11 +1,12 @@
 const db = require("../../../../config/db");
 const { sendReminderEmail } = require("../../../../utils/mailer");
 
-module.exports.getAllReminders = async () => {
+module.exports.getAllReminders = async (userId) => {
   try {
     const reminders = await db("reminders")
       .leftJoin("invoices", "reminders.invoice_id", "invoices.id")
       .leftJoin("clients", "invoices.client_id", "clients.id")
+      .where("reminders.user_id", userId)
       .select(
         "reminders.*",
         "invoices.invoice_no",
@@ -22,11 +23,12 @@ module.exports.getAllReminders = async () => {
   }
 };
 
-module.exports.getReminderById = async (id) => {
+module.exports.getReminderById = async (id, userId) => {
   try {
-    const reminder = await db("reminders")
+    const query = db("reminders")
       .leftJoin("invoices", "reminders.invoice_id", "invoices.id")
       .leftJoin("clients", "invoices.client_id", "clients.id")
+      .where("reminders.id", id)
       .select(
         "reminders.*",
         "invoices.invoice_no",
@@ -34,20 +36,21 @@ module.exports.getReminderById = async (id) => {
         "invoices.due_date",
         "clients.name as client_name",
         "clients.email as client_email",
-      )
-      .where({ "reminders.id": id })
-      .first();
-    return reminder;
+      );
+
+    if (userId) query.andWhere("reminders.user_id", userId);
+
+    return await query.first();
   } catch (err) {
     console.error("Service Error:", err);
     throw new Error("Failed to fetch reminder");
   }
 };
 
-module.exports.createReminder = async (data) => {
+module.exports.createReminder = async (data, userId) => {
   try {
-    const [id] = await db("reminders").insert(data);
-    const newReminder = await module.exports.getReminderById(id);
+    const [id] = await db("reminders").insert({ ...data, user_id: userId });
+    const newReminder = await module.exports.getReminderById(id, userId);
     return { status: true, data: newReminder };
   } catch (err) {
     console.error("Service Error:", err);
@@ -55,13 +58,16 @@ module.exports.createReminder = async (data) => {
   }
 };
 
-module.exports.updateReminder = async (id, data) => {
+module.exports.updateReminder = async (id, data, userId) => {
   try {
-    const updated = await db("reminders").where({ id }).update(data);
+    const updated = await db("reminders")
+      .where({ id, user_id: userId })
+      .update(data);
+
     if (!updated) {
       return { status: false, message: "Reminder not found" };
     }
-    const updatedReminder = await module.exports.getReminderById(id);
+    const updatedReminder = await module.exports.getReminderById(id, userId);
     return { status: true, data: updatedReminder };
   } catch (err) {
     console.error("Service Error:", err);
@@ -69,9 +75,9 @@ module.exports.updateReminder = async (id, data) => {
   }
 };
 
-module.exports.triggerReminder = async (id) => {
+module.exports.triggerReminder = async (id, userId) => {
   try {
-    const reminder = await module.exports.getReminderById(id);
+    const reminder = await module.exports.getReminderById(id, userId);
     if (!reminder) {
       return { status: false, message: "Reminder not found" };
     }
@@ -107,18 +113,15 @@ module.exports.triggerReminder = async (id) => {
   }
 };
 
-// In service/index.js  (or reminders service)
 module.exports.processReminders = async () => {
   try {
     const today = new Date().toISOString().split("T")[0];
 
-    // Update overdue
     await db("reminders")
-      .where("status", "pending") // ← consistent with your schema
+      .where("status", "pending")
       .where("reminder_date", "<", today)
       .update({ status: "overdue" });
 
-    // Get reminders to send today
     const remindersToSend = await db("reminders")
       .leftJoin("invoices", "reminders.invoice_id", "invoices.id")
       .leftJoin("clients", "invoices.client_id", "clients.id")
@@ -160,11 +163,7 @@ module.exports.processReminders = async () => {
       }
     }
 
-    return {
-      success: true,
-      processed: results.length,
-      details: results,
-    };
+    return { success: true, processed: results.length, details: results };
   } catch (err) {
     console.error("Process Reminders Error:", err);
     throw err;

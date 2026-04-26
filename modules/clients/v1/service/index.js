@@ -1,8 +1,9 @@
 const db = require("../../../../config/db");
 
-module.exports.getAllClients = async () => {
+module.exports.getAllClients = async (userId) => {
   try {
     const clients = await db("clients")
+      .where({ user_id: userId })
       .select("*")
       .orderBy("created_at", "desc");
     return clients;
@@ -12,11 +13,12 @@ module.exports.getAllClients = async () => {
   }
 };
 
-module.exports.getClientById = async (id) => {
+module.exports.getClientById = async (id, userId) => {
   try {
     const rows = await db("clients")
       .leftJoin("invoices", "clients.id", "invoices.client_id")
       .where("clients.id", id)
+      .andWhere("clients.user_id", userId)
       .select(
         "clients.*",
         "invoices.id as invoice_id",
@@ -28,23 +30,22 @@ module.exports.getClientById = async (id) => {
 
     if (!rows.length) return null;
 
-    // Extract client
     const client = {
       id: rows[0].id,
       name: rows[0].name,
       email: rows[0].email,
       phone: rows[0].phone,
       address: rows[0].address,
-      contact_person: rows[0].contact_person, // ✅
-      gstin: rows[0].gstin, // ✅
-      city: rows[0].city, // ✅
-      state: rows[0].state, // ✅
-      zip: rows[0].zip, // ✅
-      payment_terms: rows[0].payment_terms, // ✅
+      contact_person: rows[0].contact_person,
+      gstin: rows[0].gstin,
+      city: rows[0].city,
+      state: rows[0].state,
+      zip: rows[0].zip,
+      payment_terms: rows[0].payment_terms,
       created_at: rows[0].created_at,
       invoices: [],
     };
-    // Attach invoices
+
     rows.forEach((row) => {
       if (row.invoice_id) {
         client.invoices.push({
@@ -64,9 +65,12 @@ module.exports.getClientById = async (id) => {
   }
 };
 
-module.exports.createClient = async (data) => {
+module.exports.createClient = async (data, userId) => {
   try {
-    const existing = await db("clients").where({ email: data.email }).first();
+    // Check duplicate email scoped to this user
+    const existing = await db("clients")
+      .where({ email: data.email, user_id: userId })
+      .first();
 
     if (existing) {
       return {
@@ -76,6 +80,7 @@ module.exports.createClient = async (data) => {
     }
 
     const payload = {
+      user_id: userId,
       name: data.name,
       contact_person: data.contactPerson,
       email: data.email,
@@ -89,7 +94,6 @@ module.exports.createClient = async (data) => {
     };
 
     const [id] = await db("clients").insert(payload);
-
     const newClient = await db("clients").where({ id }).first();
 
     return { status: true, data: newClient };
@@ -99,13 +103,18 @@ module.exports.createClient = async (data) => {
   }
 };
 
-module.exports.updateClient = async (id, data) => {
+module.exports.updateClient = async (id, data, userId) => {
   try {
     if (!id) throw new Error("Client ID is missing");
 
-    // Check duplicate email
+    // Ensure client belongs to this user
+    const client = await db("clients").where({ id, user_id: userId }).first();
+    if (!client) throw new Error("Client not found or unauthorized");
+
+    // Check duplicate email scoped to this user
     const existing = await db("clients")
       .where("email", data.email)
+      .andWhere("user_id", userId)
       .andWhereNot("id", id)
       .first();
 
@@ -113,9 +122,9 @@ module.exports.updateClient = async (id, data) => {
       throw new Error("Email already exists");
     }
 
-    await db("clients").where("id", id).update({
+    await db("clients").where({ id, user_id: userId }).update({
       name: data.name,
-      contact_person: data.contactPerson, // ✅ FIX
+      contact_person: data.contactPerson,
       email: data.email,
       phone: data.phone,
       gstin: data.gstin,
@@ -123,7 +132,7 @@ module.exports.updateClient = async (id, data) => {
       city: data.city,
       state: data.state,
       zip: data.zip,
-      payment_terms: data.paymentTerms, // ✅ FIX
+      payment_terms: data.paymentTerms,
       updated_at: db.fn.now(),
     });
 
@@ -134,9 +143,9 @@ module.exports.updateClient = async (id, data) => {
   }
 };
 
-module.exports.deleteClient = async (id) => {
+module.exports.deleteClient = async (id, userId) => {
   try {
-    const deleted = await db("clients").where({ id }).del();
+    const deleted = await db("clients").where({ id, user_id: userId }).del();
     if (!deleted) {
       return { status: false, message: "Client not found." };
     }
@@ -147,9 +156,11 @@ module.exports.deleteClient = async (id) => {
   }
 };
 
-module.exports.toggleClientStatus = async (id, status) => {
+module.exports.toggleClientStatus = async (id, status, userId) => {
   try {
-    const updated = await db("clients").where({ id }).update({ status });
+    const updated = await db("clients")
+      .where({ id, user_id: userId })
+      .update({ status });
 
     if (!updated) {
       return { status: false, message: "Client not found" };

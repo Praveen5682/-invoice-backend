@@ -1,20 +1,23 @@
 const db = require("../../../../config/db");
 
-// ✅ CREATE
-module.exports.createProduct = async (data) => {
+module.exports.createProduct = async (data, userId) => {
   try {
-    const existing = await db("products").where({ name: data.name }).first();
+    // Duplicate check scoped to this user
+    const existing = await db("products")
+      .where({ name: data.name, user_id: userId })
+      .first();
 
     if (existing) {
       throw new Error("Product already exists");
     }
 
     const [id] = await db("products").insert({
+      user_id: userId,
       name: data.name,
       description: data.description,
       price: data.price,
       category: data.category,
-      type: data.type, // product / service
+      type: data.type,
       status: data.status ?? 1,
     });
 
@@ -26,22 +29,20 @@ module.exports.createProduct = async (data) => {
   }
 };
 
-// ✅ GET ALL
-module.exports.getProducts = async () => {
+module.exports.getProducts = async (userId) => {
   try {
-    return await db("products").orderBy("id", "desc");
+    return await db("products").where({ user_id: userId }).orderBy("id", "desc");
   } catch (err) {
     console.error("Service Error (getProducts):", err.message);
     throw new Error("Failed to fetch products");
   }
 };
 
-// ✅ GET BY ID
-module.exports.getProductById = async (id) => {
+module.exports.getProductById = async (id, userId) => {
   try {
     if (!id) throw new Error("Product ID is missing");
 
-    const product = await db("products").where({ id }).first();
+    const product = await db("products").where({ id, user_id: userId }).first();
 
     if (!product) throw new Error("Product not found");
 
@@ -52,12 +53,15 @@ module.exports.getProductById = async (id) => {
   }
 };
 
-// ✅ UPDATE
-module.exports.updateProduct = async (id, data) => {
+module.exports.updateProduct = async (id, data, userId) => {
   try {
     if (!id) throw new Error("Product ID is missing");
 
-    const affectedRows = await db("products").where({ id }).update({
+    // Ensure product belongs to user
+    const product = await db("products").where({ id, user_id: userId }).first();
+    if (!product) throw new Error("Product not found or unauthorized");
+
+    await db("products").where({ id, user_id: userId }).update({
       name: data.name,
       description: data.description,
       price: data.price,
@@ -70,15 +74,15 @@ module.exports.updateProduct = async (id, data) => {
     return await db("products").where({ id }).first();
   } catch (err) {
     console.error("Service Error (updateProduct):", err.message);
-    throw err; // ✅ keep original error
+    throw err;
   }
 };
-// ✅ DELETE
-module.exports.deleteProduct = async (id) => {
+
+module.exports.deleteProduct = async (id, userId) => {
   try {
     if (!id) throw new Error("Product ID is missing");
 
-    const deleted = await db("products").where({ id }).del();
+    const deleted = await db("products").where({ id, user_id: userId }).del();
 
     if (!deleted) throw new Error("Product not found");
 
@@ -89,15 +93,15 @@ module.exports.deleteProduct = async (id) => {
   }
 };
 
-// ✅ TOGGLE STATUS
-module.exports.toggleStatus = async (id, status) => {
+module.exports.toggleStatus = async (id, status, userId) => {
   try {
     if (!id) throw new Error("Product ID is missing");
 
-    await db("products").where({ id }).update({
-      status,
-      updated_at: new Date(),
-    });
+    const updated = await db("products")
+      .where({ id, user_id: userId })
+      .update({ status, updated_at: new Date() });
+
+    if (!updated) throw new Error("Product not found or unauthorized");
 
     return true;
   } catch (err) {

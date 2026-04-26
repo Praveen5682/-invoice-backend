@@ -1,10 +1,11 @@
 const db = require("../../../../config/db");
 
-module.exports.getAllPayments = async () => {
+module.exports.getAllPayments = async (userId) => {
   try {
     const payments = await db("payments")
       .leftJoin("invoices", "payments.invoice_id", "invoices.id")
       .leftJoin("clients", "invoices.client_id", "clients.id")
+      .where("payments.user_id", userId)
       .select(
         "payments.*",
         "invoices.invoice_no",
@@ -18,17 +19,18 @@ module.exports.getAllPayments = async () => {
   }
 };
 
-module.exports.getPaymentById = async (id) => {
+module.exports.getPaymentById = async (id, userId) => {
   try {
     const payment = await db("payments")
       .leftJoin("invoices", "payments.invoice_id", "invoices.id")
       .leftJoin("clients", "invoices.client_id", "clients.id")
+      .where("payments.id", id)
+      .andWhere("payments.user_id", userId)
       .select(
         "payments.*",
         "invoices.invoice_no",
         "clients.name as client_name",
       )
-      .where({ "payments.id": id })
       .first();
     return payment;
   } catch (err) {
@@ -37,16 +39,13 @@ module.exports.getPaymentById = async (id) => {
   }
 };
 
-module.exports.createPayment = async (data) => {
+module.exports.createPayment = async (data, userId) => {
   const trx = await db.transaction();
   try {
-    const [id] = await trx("payments").insert(data);
-
-    // Let's also update the invoice if necessary, but for now just register it.
-    // For example if payment captures full amount, mark invoice as Paid
+    const [id] = await trx("payments").insert({ ...data, user_id: userId });
 
     await trx.commit();
-    const newPayment = await module.exports.getPaymentById(id);
+    const newPayment = await module.exports.getPaymentById(id, userId);
     return { status: true, data: newPayment };
   } catch (err) {
     await trx.rollback();
@@ -55,13 +54,16 @@ module.exports.createPayment = async (data) => {
   }
 };
 
-module.exports.updatePayment = async (id, data) => {
+module.exports.updatePayment = async (id, data, userId) => {
   try {
-    const updated = await db("payments").where({ id }).update(data);
+    const updated = await db("payments")
+      .where({ id, user_id: userId })
+      .update(data);
+
     if (!updated) {
       return { status: false, message: "Payment not found" };
     }
-    const updatedPayment = await module.exports.getPaymentById(id);
+    const updatedPayment = await module.exports.getPaymentById(id, userId);
     return { status: true, data: updatedPayment };
   } catch (err) {
     console.error("Service Error:", err);

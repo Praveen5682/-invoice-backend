@@ -6,7 +6,7 @@ const {
 
 module.exports.getAllReminders = async (req, res) => {
   try {
-    const reminders = await service.getAllReminders();
+    const reminders = await service.getAllReminders(req.user.id);
     return res.status(200).json({ success: true, data: reminders });
   } catch (err) {
     console.error("Reminder Controller Error:", err);
@@ -18,7 +18,7 @@ module.exports.getAllReminders = async (req, res) => {
 
 module.exports.getReminderById = async (req, res) => {
   try {
-    const reminder = await service.getReminderById(req.params.id);
+    const reminder = await service.getReminderById(req.params.id, req.user.id);
     if (!reminder) {
       return res
         .status(404)
@@ -42,7 +42,7 @@ module.exports.createReminder = async (req, res) => {
         .json({ success: false, message: error.details[0].message });
     }
 
-    const response = await service.createReminder(value);
+    const response = await service.createReminder(value, req.user.id);
     if (!response.status) {
       return res
         .status(400)
@@ -71,7 +71,7 @@ module.exports.updateReminder = async (req, res) => {
         .json({ success: false, message: error.details[0].message });
     }
 
-    const response = await service.updateReminder(req.params.id, value);
+    const response = await service.updateReminder(req.params.id, value, req.user.id);
     if (!response.status) {
       return res
         .status(400)
@@ -93,7 +93,7 @@ module.exports.updateReminder = async (req, res) => {
 
 module.exports.triggerReminder = async (req, res) => {
   try {
-    const response = await service.triggerReminder(req.params.id);
+    const response = await service.triggerReminder(req.params.id, req.user.id);
 
     if (!response.status) {
       return res

@@ -6,7 +6,7 @@ const {
 
 module.exports.getAllPayments = async (req, res) => {
   try {
-    const payments = await service.getAllPayments();
+    const payments = await service.getAllPayments(req.user.id);
     return res.status(200).json({ success: true, data: payments });
   } catch (err) {
     console.error("Payment Controller Error:", err);
@@ -18,7 +18,7 @@ module.exports.getAllPayments = async (req, res) => {
 
 module.exports.getPaymentById = async (req, res) => {
   try {
-    const payment = await service.getPaymentById(req.params.id);
+    const payment = await service.getPaymentById(req.params.id, req.user.id);
     if (!payment) {
       return res
         .status(404)
@@ -42,20 +42,18 @@ module.exports.createPayment = async (req, res) => {
         .json({ success: false, message: error.details[0].message });
     }
 
-    const response = await service.createPayment(value);
+    const response = await service.createPayment(value, req.user.id);
     if (!response.status) {
       return res
         .status(400)
         .json({ success: false, message: response.message });
     }
 
-    return res
-      .status(201)
-      .json({
-        success: true,
-        message: "Payment created successfully.",
-        data: response.data,
-      });
+    return res.status(201).json({
+      success: true,
+      message: "Payment created successfully.",
+      data: response.data,
+    });
   } catch (err) {
     console.error("Payment Controller Error:", err);
     return res
@@ -73,20 +71,18 @@ module.exports.updatePayment = async (req, res) => {
         .json({ success: false, message: error.details[0].message });
     }
 
-    const response = await service.updatePayment(req.params.id, value);
+    const response = await service.updatePayment(req.params.id, value, req.user.id);
     if (!response.status) {
       return res
         .status(400)
         .json({ success: false, message: response.message });
     }
 
-    return res
-      .status(200)
-      .json({
-        success: true,
-        message: "Payment updated successfully.",
-        data: response.data,
-      });
+    return res.status(200).json({
+      success: true,
+      message: "Payment updated successfully.",
+      data: response.data,
+    });
   } catch (err) {
     console.error("Payment Controller Error:", err);
     return res

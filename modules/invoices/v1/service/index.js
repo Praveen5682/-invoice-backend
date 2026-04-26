@@ -1,9 +1,10 @@
 const db = require("../../../../config/db");
 
-module.exports.getAllInvoices = async () => {
+module.exports.getAllInvoices = async (userId) => {
   try {
     const invoices = await db("invoices")
       .leftJoin("clients", "invoices.client_id", "clients.id")
+      .where("invoices.user_id", userId)
       .select(
         "invoices.id as id",
         "invoices.invoice_no",
@@ -31,10 +32,8 @@ module.exports.getAllInvoices = async () => {
         "invoices.bank_details",
         "invoices.billing_address",
         "invoices.client_phone",
-
-        // ✅ Fallback: use client table if joined, else use invoice's own snapshot columns
         db.raw(
-          "COALESCE(clients.name,  invoices.billing_address->>'$.line1', 'Unknown') as name",
+          "COALESCE(clients.name, invoices.billing_address->>'$.line1', 'Unknown') as name",
         ),
         db.raw("COALESCE(clients.email, NULL) as email"),
         db.raw("COALESCE(clients.phone, invoices.client_phone) as phone"),
@@ -42,7 +41,6 @@ module.exports.getAllInvoices = async () => {
       )
       .orderBy("invoices.created_at", "desc");
 
-    // Parse billing_address to extract name/email for manual-entry invoices
     return invoices.map((inv) => {
       if (!inv.client_id) {
         const billing =
@@ -52,9 +50,7 @@ module.exports.getAllInvoices = async () => {
 
         return {
           ...inv,
-          // Use stored client_phone as phone fallback
           phone: inv.phone || inv.client_phone || null,
-          // Build a readable "address" string from billing_address for display
           address:
             [billing.line1, billing.city, billing.state]
               .filter(Boolean)
@@ -69,7 +65,6 @@ module.exports.getAllInvoices = async () => {
   }
 };
 
-// Helper: safely parse a JSON field that may already be an object or a string
 const parseJson = (val, fallback = {}) => {
   if (!val) return fallback;
   if (typeof val === "object") return val;
@@ -80,9 +75,9 @@ const parseJson = (val, fallback = {}) => {
   }
 };
 
-module.exports.getInvoiceById = async (id) => {
+module.exports.getInvoiceById = async (id, userId) => {
   try {
-    const invoice = await db("invoices")
+    const query = db("invoices")
       .leftJoin("clients", "invoices.client_id", "clients.id")
       .select(
         "invoices.id as id",
@@ -92,15 +87,17 @@ module.exports.getInvoiceById = async (id) => {
         "clients.phone",
         "clients.address",
       )
-      .where({ "invoices.id": id })
-      .first();
+      .where({ "invoices.id": id });
 
+    // If userId provided, scope to user
+    if (userId) query.andWhere("invoices.user_id", userId);
+
+    const invoice = await query.first();
     if (!invoice) return null;
 
     const items = await db("invoice_items").where({ invoice_id: id });
     invoice.items = items;
 
-    // Always return these as parsed objects so the frontend never needs JSON.parse
     invoice.bank_details = parseJson(invoice.bank_details);
     invoice.signature = parseJson(invoice.signature);
     invoice.billing_address = parseJson(invoice.billing_address);
@@ -113,11 +110,11 @@ module.exports.getInvoiceById = async (id) => {
   }
 };
 
-module.exports.createInvoice = async (data) => {
+module.exports.createInvoice = async (data, userId) => {
   const trx = await db.transaction();
   try {
     const existing = await trx("invoices")
-      .where({ invoice_no: data.invoice_no })
+      .where({ invoice_no: data.invoice_no, user_id: userId })
       .first();
 
     if (existing) {
@@ -127,7 +124,7 @@ module.exports.createInvoice = async (data) => {
 
     const { items, client, bank_details, signature, ...invoiceData } = data;
 
-    // ✅ Explicitly set client_id to null if not provided
+    invoiceData.user_id = userId;
     invoiceData.client_id = data.client_id || null;
 
     if (bank_details) invoiceData.bank_details = JSON.stringify(bank_details);
@@ -152,6 +149,7 @@ module.exports.createInvoice = async (data) => {
       await trx("invoice_items").insert(
         items.map((item) => ({
           invoice_id: invoiceId,
+          user_id: userId,
           description: item.description,
           quantity: item.quantity,
           unit_price: item.unit_price,
@@ -162,7 +160,7 @@ module.exports.createInvoice = async (data) => {
     }
 
     await trx.commit();
-    const invoice = await module.exports.getInvoiceById(invoiceId);
+    const invoice = await module.exports.getInvoiceById(invoiceId, userId);
     return { status: true, data: invoice };
   } catch (err) {
     await trx.rollback();
@@ -171,22 +169,26 @@ module.exports.createInvoice = async (data) => {
   }
 };
 
-module.exports.updateInvoice = async (id, data) => {
+module.exports.updateInvoice = async (id, data, userId) => {
   const trx = await db.transaction();
   try {
+    // Ensure invoice belongs to this user
+    const invoice = await trx("invoices").where({ id, user_id: userId }).first();
+    if (!invoice) {
+      await trx.rollback();
+      return { status: false, message: "Invoice not found or unauthorized" };
+    }
+
     const { items, client, bank_details, signature, ...invoiceData } = data;
 
     if (bank_details) invoiceData.bank_details = JSON.stringify(bank_details);
     if (signature) invoiceData.signature = JSON.stringify(signature);
 
     if (client) {
-      if (client.gstin !== undefined)
-        invoiceData.client_gstin = client.gstin || null;
+      if (client.gstin !== undefined) invoiceData.client_gstin = client.gstin || null;
       if (client.pan !== undefined) invoiceData.client_pan = client.pan || null;
-      if (client.website !== undefined)
-        invoiceData.client_website = client.website || null;
-      if (client.phone !== undefined)
-        invoiceData.client_phone = client.phone || null;
+      if (client.website !== undefined) invoiceData.client_website = client.website || null;
+      if (client.phone !== undefined) invoiceData.client_phone = client.phone || null;
       if (client.place_of_supply !== undefined)
         invoiceData.place_of_supply = client.place_of_supply || null;
 
@@ -196,11 +198,7 @@ module.exports.updateInvoice = async (id, data) => {
         invoiceData.shipping_address = JSON.stringify(client.shipping_address);
     }
 
-    const updated = await trx("invoices").where({ id }).update(invoiceData);
-    if (!updated) {
-      await trx.rollback();
-      return { status: false, message: "Invoice not found" };
-    }
+    await trx("invoices").where({ id, user_id: userId }).update(invoiceData);
 
     if (items) {
       await trx("invoice_items").where({ invoice_id: id }).del();
@@ -208,6 +206,7 @@ module.exports.updateInvoice = async (id, data) => {
         await trx("invoice_items").insert(
           items.map((item) => ({
             invoice_id: id,
+            user_id: userId,
             description: item.description,
             quantity: item.quantity,
             unit_price: item.unit_price,
@@ -219,7 +218,7 @@ module.exports.updateInvoice = async (id, data) => {
     }
 
     await trx.commit();
-    const updatedInvoice = await module.exports.getInvoiceById(id);
+    const updatedInvoice = await module.exports.getInvoiceById(id, userId);
     return { status: true, data: updatedInvoice };
   } catch (err) {
     await trx.rollback();
@@ -228,9 +227,9 @@ module.exports.updateInvoice = async (id, data) => {
   }
 };
 
-module.exports.deleteInvoice = async (id) => {
+module.exports.deleteInvoice = async (id, userId) => {
   try {
-    const deleted = await db("invoices").where({ id }).del();
+    const deleted = await db("invoices").where({ id, user_id: userId }).del();
     if (!deleted) return { status: false, message: "Invoice not found" };
     return { status: true, message: "Invoice deleted successfully" };
   } catch (err) {
@@ -239,9 +238,11 @@ module.exports.deleteInvoice = async (id) => {
   }
 };
 
-module.exports.updateInvoiceStatus = async (id, status) => {
+module.exports.updateInvoiceStatus = async (id, status, userId) => {
   try {
-    const updated = await db("invoices").where({ id }).update({ status });
+    const updated = await db("invoices")
+      .where({ id, user_id: userId })
+      .update({ status });
     if (!updated) return { status: false, message: "Invoice not found" };
     return { status: true, message: "Status updated successfully" };
   } catch (err) {
