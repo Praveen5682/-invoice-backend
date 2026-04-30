@@ -5,7 +5,19 @@ module.exports.getAllClients = async (userId) => {
   try {
     const clients = await db("clients")
       .where({ user_id: userId })
-      .select("*")
+      .select([
+        "clients.*",
+        db("invoices")
+          .whereRaw("invoices.client_id = clients.id")
+          .andWhereNot("status", "draft")
+          .sum("total_amount")
+          .as("total_revenue"),
+        db("invoices")
+          .whereRaw("invoices.client_id = clients.id")
+          .andWhereNot("status", "draft")
+          .sum("amount_paid")
+          .as("total_paid"),
+      ])
       .orderBy("created_at", "desc");
     return clients;
   } catch (err) {
@@ -25,6 +37,8 @@ module.exports.getClientById = async (id, userId) => {
         "invoices.id as invoice_id",
         "invoices.invoice_no",
         "invoices.total_amount",
+        "invoices.amount_paid",
+        "invoices.due_date",
         "invoices.status",
         "invoices.created_at as invoice_date",
       );
@@ -59,11 +73,30 @@ module.exports.getClientById = async (id, userId) => {
           id: row.invoice_id,
           invoice_no: row.invoice_no,
           total_amount: row.total_amount,
+          amount_paid: row.amount_paid,
+          due_date: row.due_date,
           status: row.status,
           date: row.invoice_date,
         });
       }
     });
+
+    // Calculate totals from non-draft invoices
+    const activeInvoices = client.invoices.filter((inv) => inv.status !== "draft");
+    client.total_revenue = activeInvoices.reduce(
+      (sum, inv) => sum + Number(inv.total_amount || 0),
+      0,
+    );
+
+    // Fetch paid amount from invoices table directly for accuracy
+    const paymentStats = await db("invoices")
+      .where({ client_id: id, user_id: userId })
+      .andWhereNot("status", "draft")
+      .select([db.raw("SUM(COALESCE(amount_paid, 0)) as total_paid")])
+      .first();
+
+    client.total_paid = Number(paymentStats?.total_paid || 0);
+    client.balance_due = client.total_revenue - client.total_paid;
 
     return client;
   } catch (err) {

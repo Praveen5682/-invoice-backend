@@ -89,7 +89,6 @@ module.exports.getOverdueReminders = async (userId) => {
 
 module.exports.getMonthlyReports = async (userId) => {
   try {
-    const currentYear = new Date().getFullYear();
     const data = await db("invoices")
       .where({ user_id: userId })
       .select(
@@ -99,7 +98,6 @@ module.exports.getMonthlyReports = async (userId) => {
         db.raw("SUM(COALESCE(amount_paid, 0)) as paid_amount"),
         db.raw("SUM(total_amount - COALESCE(amount_paid, 0)) as pending_amount")
       )
-      .whereRaw("YEAR(COALESCE(issue_date, created_at)) = ?", [currentYear])
       .groupByRaw("DATE_FORMAT(COALESCE(issue_date, created_at), '%M %Y')")
       .orderByRaw("MIN(COALESCE(issue_date, created_at)) DESC");
     return data;
@@ -111,7 +109,6 @@ module.exports.getMonthlyReports = async (userId) => {
 
 module.exports.getQuarterlyReports = async (userId) => {
   try {
-    const currentYear = new Date().getFullYear();
     const data = await db("invoices")
       .where({ user_id: userId })
       .select(
@@ -121,8 +118,7 @@ module.exports.getQuarterlyReports = async (userId) => {
         db.raw("SUM(COALESCE(amount_paid, 0)) as paid_amount"),
         db.raw("SUM(total_amount - COALESCE(amount_paid, 0)) as pending_amount")
       )
-      .whereRaw("YEAR(COALESCE(issue_date, created_at)) = ?", [currentYear])
-      .groupByRaw("QUARTER(COALESCE(issue_date, created_at)), YEAR(COALESCE(issue_date, created_at))")
+      .groupByRaw("YEAR(COALESCE(issue_date, created_at)), QUARTER(COALESCE(issue_date, created_at))")
       .orderByRaw("YEAR(COALESCE(issue_date, created_at)) DESC, QUARTER(COALESCE(issue_date, created_at)) DESC");
     return data;
   } catch (err) {
@@ -162,8 +158,8 @@ module.exports.getWeeklyReports = async (userId) => {
         db.raw("SUM(COALESCE(amount_paid, 0)) as paid_amount"),
         db.raw("SUM(total_amount - COALESCE(amount_paid, 0)) as pending_amount")
       )
-      .groupByRaw("YEARWEEK(COALESCE(issue_date, created_at))")
-      .orderByRaw("YEARWEEK(COALESCE(issue_date, created_at)) DESC")
+      .groupByRaw("YEAR(COALESCE(issue_date, created_at)), WEEK(COALESCE(issue_date, created_at))")
+      .orderByRaw("YEAR(COALESCE(issue_date, created_at)) DESC, WEEK(COALESCE(issue_date, created_at)) DESC")
       .limit(12);
     return data;
   } catch (err) {
