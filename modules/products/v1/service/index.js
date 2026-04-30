@@ -1,65 +1,69 @@
+// service/index.js
 const db = require("../../../../config/db");
 
 module.exports.createProduct = async (data, userId) => {
   try {
-    // Duplicate check scoped to this user
+    // Check duplicate name for this user
     const existing = await db("products")
       .where({ name: data.name, user_id: userId })
       .first();
 
     if (existing) {
-      throw new Error("Product already exists");
+      throw new Error("A product with this name already exists");
     }
 
     const [id] = await db("products").insert({
       user_id: userId,
       name: data.name,
-      description: data.description,
+      description: data.description || null,
       price: data.price,
-      category: data.category,
-      type: data.type,
+      category: data.category || null,
+      type: data.type || "service",
       status: data.status ?? 1,
     });
 
     const product = await db("products").where({ id }).first();
     return product;
   } catch (err) {
-    console.error("Service Error (createProduct):", err.message);
-    throw new Error(err.message || "Failed to create product");
+    console.error("Service Error (createProduct):", err);
+    throw err;
   }
 };
 
 module.exports.getProducts = async (userId) => {
   try {
-    return await db("products").where({ user_id: userId }).orderBy("id", "desc");
+    return await db("products")
+      .where({ user_id: userId })
+      .orderBy("created_at", "desc");
   } catch (err) {
-    console.error("Service Error (getProducts):", err.message);
+    console.error("Service Error (getProducts):", err);
     throw new Error("Failed to fetch products");
   }
 };
 
 module.exports.getProductById = async (id, userId) => {
   try {
-    if (!id) throw new Error("Product ID is missing");
-
     const product = await db("products").where({ id, user_id: userId }).first();
 
-    if (!product) throw new Error("Product not found");
+    if (!product) throw new Error("Product not found or unauthorized");
 
     return product;
   } catch (err) {
-    console.error("Service Error (getProductById):", err.message);
-    throw new Error(err.message || "Failed to fetch product");
+    console.error("Service Error (getProductById):", err);
+    throw err;
   }
 };
 
 module.exports.updateProduct = async (id, data, userId) => {
   try {
-    if (!id) throw new Error("Product ID is missing");
+    if (!id) throw new Error("Product ID is required");
 
-    // Ensure product belongs to user
-    const product = await db("products").where({ id, user_id: userId }).first();
-    if (!product) throw new Error("Product not found or unauthorized");
+    // Verify ownership
+    const existing = await db("products")
+      .where({ id, user_id: userId })
+      .first();
+
+    if (!existing) throw new Error("Product not found or unauthorized");
 
     await db("products").where({ id, user_id: userId }).update({
       name: data.name,
@@ -68,44 +72,43 @@ module.exports.updateProduct = async (id, data, userId) => {
       category: data.category,
       type: data.type,
       status: data.status,
-      updated_at: new Date(),
+      updated_at: db.fn.now(),
     });
 
     return await db("products").where({ id }).first();
   } catch (err) {
-    console.error("Service Error (updateProduct):", err.message);
+    console.error("Service Error (updateProduct):", err);
     throw err;
   }
 };
 
 module.exports.deleteProduct = async (id, userId) => {
   try {
-    if (!id) throw new Error("Product ID is missing");
-
     const deleted = await db("products").where({ id, user_id: userId }).del();
 
-    if (!deleted) throw new Error("Product not found");
+    if (!deleted) throw new Error("Product not found or unauthorized");
 
     return true;
   } catch (err) {
-    console.error("Service Error (deleteProduct):", err.message);
-    throw new Error(err.message || "Failed to delete product");
+    console.error("Service Error (deleteProduct):", err);
+    throw err;
   }
 };
 
 module.exports.toggleStatus = async (id, status, userId) => {
   try {
-    if (!id) throw new Error("Product ID is missing");
-
     const updated = await db("products")
       .where({ id, user_id: userId })
-      .update({ status, updated_at: new Date() });
+      .update({
+        status: Number(status),
+        updated_at: db.fn.now(),
+      });
 
     if (!updated) throw new Error("Product not found or unauthorized");
 
     return true;
   } catch (err) {
-    console.error("Service Error (toggleStatus):", err.message);
-    throw new Error("Failed to update status");
+    console.error("Service Error (toggleStatus):", err);
+    throw err;
   }
 };

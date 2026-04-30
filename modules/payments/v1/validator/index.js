@@ -14,7 +14,12 @@ const createPaymentSchema = Joi.object({
     .messages({
       "any.required": "Payment method is required.",
     }),
-  transaction_id: Joi.string().trim().optional(),
+  // transaction_id is required for non-CASH methods, optional for CASH
+  transaction_id: Joi.when("method", {
+    is: "CASH",
+    then: Joi.string().trim().optional().allow("", null),
+    otherwise: Joi.string().trim().optional().allow("", null),
+  }),
   status: Joi.string()
     .valid("captured", "refunded", "failed")
     .default("captured"),
@@ -25,7 +30,7 @@ const createPaymentSchema = Joi.object({
 
 const updatePaymentSchema = Joi.object({
   status: Joi.string().valid("captured", "refunded", "failed").optional(),
-  transaction_id: Joi.string().trim().optional(),
+  transaction_id: Joi.string().trim().optional().allow("", null),
 })
   .min(1)
   .messages({

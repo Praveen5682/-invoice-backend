@@ -201,3 +201,22 @@ module.exports.resetPassword = async (req, res) => {
     });
   }
 };
+module.exports.getMe = async (req, res) => {
+  try {
+    const user = await require("../../../../config/db")("users")
+      .where({ id: req.user.id })
+      .first();
+    
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    // Don't send password
+    delete user.password;
+
+    return res.status(200).json({ success: true, user });
+  } catch (err) {
+    console.error("Get Me Controller Error:", err);
+    return res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};

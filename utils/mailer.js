@@ -84,18 +84,73 @@ module.exports.sendReminderEmail = async (
 ) => {
   try {
     const info = await transporter.sendMail({
-      from: `"InvoicePro Support" <${process.env.EMAIL_USER}>`,
+      from: `"InvoicePro Support" <${process.env.MAIL_USER}>`,
       to: clientEmail,
       subject: `Payment Reminder: Invoice #${invoiceNo}`,
       html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-          <h2 style="color: #6C5DD3;">Payment Reminder</h2>
-          <p>Hi <strong>${clientName}</strong>,</p>
-          <p>This is a friendly reminder that invoice <strong>#${invoiceNo}</strong> for the amount of <strong>₹${amount}</strong> is due on <strong>${dueDate}</strong>.</p>
-          <p>Please ensure that the payment is made by the due date to avoid any late fees.</p>
-          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-          <p style="font-size: 12px; color: #888;">Thank you for your business!</p>
-          <p style="font-size: 12px; color: #888;">InvoicePro Team</p>
+        <div style="margin:0; padding:0; background-color:#f8fafc; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+          <table width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td align="center" style="padding:40px 0;">
+                <table width="550" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff; border-radius:16px; box-shadow:0 10px 25px rgba(0,0,0,0.05); overflow:hidden; border:1px solid #e2e8f0;">
+                  
+                  <!-- Header -->
+                  <tr>
+                    <td style="background:#2563eb; padding:30px; text-align:center;">
+                      <h1 style="margin:0; color:#ffffff; font-size:24px; font-weight:800; letter-spacing:-0.5px;">InvoicePro</h1>
+                    </td>
+                  </tr>
+
+                  <!-- Body -->
+                  <tr>
+                    <td style="padding:40px; color:#1e293b;">
+                      <h2 style="margin:0 0 20px; font-size:20px; font-weight:700; color:#0f172a;">Payment Reminder</h2>
+                      <p style="font-size:16px; line-height:1.6; color:#475569; margin-bottom:25px;">
+                        Hi <strong>${clientName}</strong>,
+                      </p>
+                      <p style="font-size:15px; line-height:1.6; color:#475569; margin-bottom:30px;">
+                        This is a friendly follow-up regarding your outstanding balance for invoice <strong>#${invoiceNo}</strong>.
+                      </p>
+
+                      <!-- Summary Box -->
+                      <div style="background:#f1f5f9; border-radius:12px; padding:25px; margin-bottom:35px;">
+                        <table width="100%" cellpadding="0" cellspacing="0">
+                          <tr>
+                            <td style="padding-bottom:10px; font-size:14px; color:#64748b;">Amount Due</td>
+                            <td align="right" style="padding-bottom:10px; font-size:18px; font-weight:700; color:#0f172a;">₹${Number(amount).toLocaleString("en-IN")}</td>
+                          </tr>
+                          <tr>
+                            <td style="font-size:14px; color:#64748b;">Due Date</td>
+                            <td align="right" style="font-size:15px; font-weight:600; color:#dc2626;">${new Date(dueDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</td>
+                          </tr>
+                        </table>
+                      </div>
+
+                      <p style="font-size:14px; line-height:1.6; color:#64748b; margin-bottom:35px; text-align:center;">
+                        Please ensure the payment is completed by the due date to keep your account in good standing.
+                      </p>
+
+                      <!-- Action Button -->
+                      <div style="text-align:center;">
+                        <a href="${process.env.NEXT_PUBLIC_BASE_URL}/invoices" style="display:inline-block; background:#2563eb; color:#ffffff; padding:16px 32px; border-radius:12px; font-weight:700; text-decoration:none; font-size:15px; transition:all 0.3s ease;">
+                          View Invoice & Pay
+                        </a>
+                      </div>
+                    </td>
+                  </tr>
+
+                  <!-- Footer -->
+                  <tr>
+                    <td style="padding:30px; text-align:center; background:#f8fafc; border-top:1px solid #e2e8f0;">
+                      <p style="margin:0; font-size:13px; color:#94a3b8;">Thank you for your business!</p>
+                      <p style="margin:8px 0 0; font-size:12px; color:#cbd5e1;">© 2026 InvoicePro. All rights reserved.</p>
+                    </td>
+                  </tr>
+
+                </table>
+              </td>
+            </tr>
+          </table>
         </div>
       `,
     });

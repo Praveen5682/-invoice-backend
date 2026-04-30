@@ -26,7 +26,9 @@ module.exports.getReports = async (req, res) => {
     const { type } = req.query;
     let data;
 
-    if (type === "Quarterly") {
+    if (type === "Weekly") {
+      data = await service.getWeeklyReports(userId);
+    } else if (type === "Quarterly") {
       data = await service.getQuarterlyReports(userId);
     } else if (type === "Yearly") {
       data = await service.getYearlyReports(userId);

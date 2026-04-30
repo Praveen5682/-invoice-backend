@@ -9,4 +9,8 @@ router.get("/:id", authCheck, Controller.getPaymentById);
 router.post("/", authCheck, Controller.createPayment);
 router.put("/:id", authCheck, Controller.updatePayment);
 
+// Razorpay Routes
+router.post("/razorpay/order", authCheck, Controller.createRazorpayOrder);
+router.post("/razorpay/verify", authCheck, Controller.verifyRazorpayPayment);
+
 module.exports = router;

@@ -14,4 +14,8 @@ router.post("/resend-otp", Controller.resendOtp);
 router.post("/forgot-password", Controller.forgotPassword);
 router.post("/reset-password", Controller.resetPassword);
 
+// ─── Profile ───────────────────────
+const authCheck = require("../../../../middleware/authCheck");
+router.get("/me", authCheck, Controller.getMe);
+
 module.exports = router;

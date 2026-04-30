@@ -4,7 +4,7 @@ const bcrypt = require("bcrypt");
 module.exports.getSettings = async (userId) => {
     try {
         const user = await db("users")
-            .select("name", "email", "company_name", "gst_number", "address", "phone")
+            .select("name", "email", "company_name", "gst_number", "address", "phone", "company_logo")
             .where({ id: userId })
             .first();
         return { status: true, data: user };

@@ -90,3 +90,50 @@ module.exports.updatePayment = async (req, res) => {
       .json({ success: false, message: "Failed to update payment." });
   }
 };
+const razorpayService = require("../service/razorpay");
+
+module.exports.createRazorpayOrder = async (req, res) => {
+  try {
+    const { invoiceId } = req.body;
+    if (!invoiceId) {
+      return res.status(400).json({ success: false, message: "Invoice ID is required" });
+    }
+
+    const order = await razorpayService.createOrder(invoiceId);
+    return res.status(200).json({ success: true, data: order });
+  } catch (err) {
+    console.error("Razorpay Controller Error (createOrder):", err);
+    return res.status(500).json({ success: false, message: err.message || "Failed to create Razorpay order" });
+  }
+};
+
+module.exports.verifyRazorpayPayment = async (req, res) => {
+  try {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, invoiceId, amount } = req.body;
+    
+    // 1. Verify Signature
+    await razorpayService.verifyPayment({ razorpay_order_id, razorpay_payment_id, razorpay_signature });
+
+    // 2. Record Payment in DB
+    const paymentRecord = {
+      invoice_id: invoiceId,
+      amount: amount,
+      method: "online",
+      status: "captured",
+      transaction_id: razorpay_payment_id,
+      payment_date: new Date(),
+    };
+
+    // Note: If this is a public route, req.user might be undefined. 
+    // We should find the owner of the invoice.
+    const invoice = await require("../../../../config/db")("invoices").where({ id: invoiceId }).first();
+    if (!invoice) return res.status(404).json({ success: false, message: "Invoice not found" });
+
+    const response = await service.createPayment(paymentRecord, invoice.user_id);
+    
+    return res.status(200).json({ success: true, message: "Payment verified and recorded", data: response.data });
+  } catch (err) {
+    console.error("Razorpay Controller Error (verify):", err);
+    return res.status(400).json({ success: false, message: err.message || "Payment verification failed" });
+  }
+};
