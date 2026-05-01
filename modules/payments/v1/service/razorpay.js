@@ -2,12 +2,17 @@ const Razorpay = require("razorpay");
 const crypto = require("crypto");
 const db = require("../../../../config/db");
 
+// Razorpay is currently disabled as per user request
+/*
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
   key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
+*/
 
 module.exports.createOrder = async (invoiceId) => {
+  throw new Error("Razorpay integration is currently disabled.");
+  /*
   try {
     const invoice = await db("invoices")
       .where({ id: invoiceId })
@@ -30,9 +35,12 @@ module.exports.createOrder = async (invoiceId) => {
     console.error("Razorpay Order Error:", error);
     throw error;
   }
+  */
 };
 
 module.exports.verifyPayment = async (paymentData) => {
+  throw new Error("Razorpay integration is currently disabled.");
+  /*
   const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = paymentData;
 
   const hmac = crypto.createHmac("sha256", process.env.RAZORPAY_KEY_SECRET);
@@ -44,4 +52,5 @@ module.exports.verifyPayment = async (paymentData) => {
   }
 
   return true;
+  */
 };
