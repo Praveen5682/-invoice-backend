@@ -34,13 +34,17 @@ module.exports.Registration = async ({ name, email, password }) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const [userId] = await db("users").insert({
-      name,
-      email,
-      password: hashedPassword,
-      role: 1,
-      is_email_verified: 0,
-    });
+    const [result] = await db("users")
+      .insert({
+        name,
+        email,
+        password: hashedPassword,
+        role: 1,
+        is_email_verified: false,
+      })
+      .returning("id");
+
+    const userId = typeof result === "object" ? result.id : result;
 
     await issueOtp(email);
 
@@ -67,7 +71,7 @@ module.exports.VerifyOtp = async ({ email, otp }) => {
     if (new Date() > new Date(record.expires_at))
       return { status: false, message: "OTP expired" };
 
-    await db("users").where({ email }).update({ is_email_verified: 1 });
+    await db("users").where({ email }).update({ is_email_verified: true });
     await db("email_otps").where({ email }).del();
 
     return { status: true, message: "Email verified successfully" };

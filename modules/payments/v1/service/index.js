@@ -78,7 +78,8 @@ module.exports.createPayment = async (data, userId) => {
       delete insertData.transaction_id;
     }
 
-    const [id] = await trx("payments").insert(insertData);
+    const [result] = await trx("payments").insert(insertData).returning("id");
+    const id = typeof result === "object" ? result.id : result;
 
     // Sync invoice if captured
     if (insertData.invoice_id) {
@@ -91,7 +92,7 @@ module.exports.createPayment = async (data, userId) => {
   } catch (err) {
     await trx.rollback();
     console.error("Service Error:", err);
-    if (err.code === "ER_DUP_ENTRY" && err.sqlMessage?.includes("transaction_id")) {
+    if ((err.code === "ER_DUP_ENTRY" || err.code === "23505") && (err.sqlMessage?.includes("transaction_id") || err.detail?.includes("transaction_id"))) {
       return { status: false, message: "Transaction ID already exists." };
     }
     return { status: false, message: "Internal server error" };
@@ -123,7 +124,7 @@ module.exports.updatePayment = async (id, data, userId) => {
   } catch (err) {
     await trx.rollback();
     console.error("Service Error:", err);
-    if (err.code === "ER_DUP_ENTRY" && err.sqlMessage?.includes("transaction_id")) {
+    if ((err.code === "ER_DUP_ENTRY" || err.code === "23505") && (err.sqlMessage?.includes("transaction_id") || err.detail?.includes("transaction_id"))) {
       return { status: false, message: "Transaction ID already exists." };
     }
     return { status: false, message: "Internal server error" };

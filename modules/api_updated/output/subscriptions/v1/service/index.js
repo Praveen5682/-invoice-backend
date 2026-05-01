@@ -39,7 +39,8 @@ module.exports.getSubscriptionById = async (id, userId) => {
 
 module.exports.createSubscription = async (data, userId) => {
   try {
-    const [id] = await db("subscriptions").insert({ ...data, user_id: userId });
+    const [result] = await db("subscriptions").insert({ ...data, user_id: userId }).returning("id");
+    const id = typeof result === "object" ? result.id : result;
     const newSubscription = await module.exports.getSubscriptionById(id, userId);
     return { status: true, data: newSubscription };
   } catch (err) {

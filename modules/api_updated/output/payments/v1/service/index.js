@@ -42,7 +42,8 @@ module.exports.getPaymentById = async (id, userId) => {
 module.exports.createPayment = async (data, userId) => {
   const trx = await db.transaction();
   try {
-    const [id] = await trx("payments").insert({ ...data, user_id: userId });
+    const [result] = await trx("payments").insert({ ...data, user_id: userId }).returning("id");
+    const id = typeof result === "object" ? result.id : result;
 
     await trx.commit();
     const newPayment = await module.exports.getPaymentById(id, userId);

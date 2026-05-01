@@ -93,7 +93,8 @@ module.exports.createClient = async (data, userId) => {
       payment_terms: data.paymentTerms,
     };
 
-    const [id] = await db("clients").insert(payload);
+    const [result] = await db("clients").insert(payload).returning("id");
+    const id = typeof result === "object" ? result.id : result;
     const newClient = await db("clients").where({ id }).first();
 
     return { status: true, data: newClient };

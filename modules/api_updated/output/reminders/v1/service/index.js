@@ -49,7 +49,8 @@ module.exports.getReminderById = async (id, userId) => {
 
 module.exports.createReminder = async (data, userId) => {
   try {
-    const [id] = await db("reminders").insert({ ...data, user_id: userId });
+    const [result] = await db("reminders").insert({ ...data, user_id: userId }).returning("id");
+    const id = typeof result === "object" ? result.id : result;
     const newReminder = await module.exports.getReminderById(id, userId);
     return { status: true, data: newReminder };
   } catch (err) {

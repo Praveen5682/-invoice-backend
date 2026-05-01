@@ -4,13 +4,13 @@ require("dotenv").config({
 
 module.exports = {
   development: {
-    client: "mysql2",
-    connection: {
-      host: process.env.DEV_DB_HOST,
-      user: process.env.DEV_DB_USER,
-      password: process.env.DEV_DB_PASSWORD,
-      database: process.env.DEV_DB_NAME,
-      port: process.env.DEV_DB_PORT || 3306,
+    client: "pg",
+    connection: process.env.DATABASE_URL || {
+      host: process.env.DEV_DB_HOST || "127.0.0.1",
+      user: process.env.DEV_DB_USER || "postgres",
+      password: process.env.DEV_DB_PASSWORD || "",
+      database: process.env.DEV_DB_NAME || "postgres",
+      port: process.env.DEV_DB_PORT || 5432,
     },
     pool: { min: 2, max: 10 },
     debug: false,
@@ -23,8 +23,11 @@ module.exports = {
   },
 
   production: {
-    client: "mysql2",
-    connection: process.env.MYSQL_URL, // should be your Railway URL
+    client: "pg",
+    connection: {
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false },
+    },
     pool: { min: 2, max: 10 },
     debug: false,
     migrations: {

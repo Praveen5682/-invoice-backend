@@ -33,7 +33,7 @@ module.exports.getAllInvoices = async (userId) => {
         "invoices.billing_address",
         "invoices.client_phone",
         db.raw(
-          "COALESCE(clients.name, invoices.billing_address->>'$.line1', 'Unknown') as name",
+          "COALESCE(clients.name, invoices.billing_address->>'line1', 'Unknown') as name",
         ),
         db.raw("COALESCE(clients.email, NULL) as email"),
         db.raw("COALESCE(clients.phone, invoices.client_phone) as phone"),
@@ -143,7 +143,8 @@ module.exports.createInvoice = async (data, userId) => {
         invoiceData.shipping_address = JSON.stringify(client.shipping_address);
     }
 
-    const [invoiceId] = await trx("invoices").insert(invoiceData);
+    const [result] = await trx("invoices").insert(invoiceData).returning("id");
+    const invoiceId = typeof result === "object" ? result.id : result;
 
     if (items && items.length > 0) {
       await trx("invoice_items").insert(

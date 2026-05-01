@@ -36,7 +36,7 @@ module.exports.getAllInvoices = async (userId) => {
           COALESCE(
             clients.name, 
             invoices.client_name, 
-            JSON_UNQUOTE(JSON_EXTRACT(invoices.billing_address, '$."line1"')),
+            invoices.billing_address->>'line1',
             'Unknown Client'
           ) as client_name
         `),

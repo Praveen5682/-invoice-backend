@@ -47,11 +47,11 @@ module.exports.getChartData = async (userId) => {
     const data = await db("invoices")
       .where({ user_id: userId })
       .select(
-        db.raw("DATE_FORMAT(issue_date, '%b') as month"),
+        db.raw("TO_CHAR(issue_date, 'Mon') as month"),
         db.raw("SUM(COALESCE(amount_paid, 0)) as revenue"),
         db.raw("SUM(total_amount - COALESCE(amount_paid, 0)) as pending")
       )
-      .groupBy("month")
+      .groupByRaw("TO_CHAR(issue_date, 'Mon')")
       .orderByRaw("MIN(issue_date) ASC")
       .limit(6);
 
@@ -92,13 +92,13 @@ module.exports.getMonthlyReports = async (userId) => {
     const data = await db("invoices")
       .where({ user_id: userId })
       .select(
-        db.raw("DATE_FORMAT(COALESCE(issue_date, created_at), '%M %Y') as period"),
+        db.raw("TO_CHAR(COALESCE(issue_date, created_at), 'FMMonth YYYY') as period"),
         db.raw("COUNT(id) as invoice_count"),
         db.raw("SUM(total_amount) as total_amount"),
         db.raw("SUM(COALESCE(amount_paid, 0)) as paid_amount"),
         db.raw("SUM(total_amount - COALESCE(amount_paid, 0)) as pending_amount")
       )
-      .groupByRaw("DATE_FORMAT(COALESCE(issue_date, created_at), '%M %Y')")
+      .groupByRaw("TO_CHAR(COALESCE(issue_date, created_at), 'FMMonth YYYY')")
       .orderByRaw("MIN(COALESCE(issue_date, created_at)) DESC");
     return data;
   } catch (err) {
@@ -112,14 +112,14 @@ module.exports.getQuarterlyReports = async (userId) => {
     const data = await db("invoices")
       .where({ user_id: userId })
       .select(
-        db.raw("CONCAT('Q', QUARTER(COALESCE(issue_date, created_at)), ' ', YEAR(COALESCE(issue_date, created_at))) as period"),
+        db.raw("'Q' || EXTRACT(QUARTER FROM COALESCE(issue_date, created_at)) || ' ' || EXTRACT(YEAR FROM COALESCE(issue_date, created_at)) as period"),
         db.raw("COUNT(id) as invoice_count"),
         db.raw("SUM(total_amount) as total_amount"),
         db.raw("SUM(COALESCE(amount_paid, 0)) as paid_amount"),
         db.raw("SUM(total_amount - COALESCE(amount_paid, 0)) as pending_amount")
       )
-      .groupByRaw("YEAR(COALESCE(issue_date, created_at)), QUARTER(COALESCE(issue_date, created_at))")
-      .orderByRaw("YEAR(COALESCE(issue_date, created_at)) DESC, QUARTER(COALESCE(issue_date, created_at)) DESC");
+      .groupByRaw("EXTRACT(YEAR FROM COALESCE(issue_date, created_at)), EXTRACT(QUARTER FROM COALESCE(issue_date, created_at))")
+      .orderByRaw("EXTRACT(YEAR FROM COALESCE(issue_date, created_at)) DESC, EXTRACT(QUARTER FROM COALESCE(issue_date, created_at)) DESC");
     return data;
   } catch (err) {
     console.error("Dashboard Service Error (getQuarterlyReports):", err);
@@ -132,14 +132,14 @@ module.exports.getYearlyReports = async (userId) => {
     const data = await db("invoices")
       .where({ user_id: userId })
       .select(
-        db.raw("YEAR(COALESCE(issue_date, created_at)) as period"),
+        db.raw("EXTRACT(YEAR FROM COALESCE(issue_date, created_at)) as period"),
         db.raw("COUNT(id) as invoice_count"),
         db.raw("SUM(total_amount) as total_amount"),
         db.raw("SUM(COALESCE(amount_paid, 0)) as paid_amount"),
         db.raw("SUM(total_amount - COALESCE(amount_paid, 0)) as pending_amount")
       )
-      .groupByRaw("YEAR(COALESCE(issue_date, created_at))")
-      .orderByRaw("YEAR(COALESCE(issue_date, created_at)) DESC");
+      .groupByRaw("EXTRACT(YEAR FROM COALESCE(issue_date, created_at))")
+      .orderByRaw("EXTRACT(YEAR FROM COALESCE(issue_date, created_at)) DESC");
     return data;
   } catch (err) {
     console.error("Dashboard Service Error (getYearlyReports):", err);
@@ -152,14 +152,14 @@ module.exports.getWeeklyReports = async (userId) => {
     const data = await db("invoices")
       .where({ user_id: userId })
       .select(
-        db.raw("CONCAT('Week ', WEEK(COALESCE(issue_date, created_at)), ', ', YEAR(COALESCE(issue_date, created_at))) as period"),
+        db.raw("'Week ' || EXTRACT(WEEK FROM COALESCE(issue_date, created_at)) || ', ' || EXTRACT(YEAR FROM COALESCE(issue_date, created_at)) as period"),
         db.raw("COUNT(id) as invoice_count"),
         db.raw("SUM(total_amount) as total_amount"),
         db.raw("SUM(COALESCE(amount_paid, 0)) as paid_amount"),
         db.raw("SUM(total_amount - COALESCE(amount_paid, 0)) as pending_amount")
       )
-      .groupByRaw("YEAR(COALESCE(issue_date, created_at)), WEEK(COALESCE(issue_date, created_at))")
-      .orderByRaw("YEAR(COALESCE(issue_date, created_at)) DESC, WEEK(COALESCE(issue_date, created_at)) DESC")
+      .groupByRaw("EXTRACT(YEAR FROM COALESCE(issue_date, created_at)), EXTRACT(WEEK FROM COALESCE(issue_date, created_at))")
+      .orderByRaw("EXTRACT(YEAR FROM COALESCE(issue_date, created_at)) DESC, EXTRACT(WEEK FROM COALESCE(issue_date, created_at)) DESC")
       .limit(12);
     return data;
   } catch (err) {

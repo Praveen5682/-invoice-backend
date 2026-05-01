@@ -12,7 +12,7 @@ module.exports.createProduct = async (data, userId) => {
       throw new Error("A product with this name already exists");
     }
 
-    const [id] = await db("products").insert({
+    const [result] = await db("products").insert({
       user_id: userId,
       name: data.name,
       description: data.description || null,
@@ -20,8 +20,9 @@ module.exports.createProduct = async (data, userId) => {
       category: data.category || null,
       type: data.type || "service",
       status: data.status ?? 1,
-    });
+    }).returning("id");
 
+    const id = typeof result === "object" ? result.id : result;
     const product = await db("products").where({ id }).first();
     return product;
   } catch (err) {
